@@ -1,6 +1,15 @@
 use std::collections::{HashMap,HashSet};
 use std::io::{stdin,stdout,Write};
 use std::process::Command;
+use structopt::StructOpt;
+
+/// Keep a git repository clean and tidy.
+#[derive(StructOpt)]
+struct Config {
+    /// Branches to exclude (in addition to master)
+    #[structopt(short="x", long)]
+    excluded: Vec<String>,
+}
 
 fn git(subcommand: &str, args: Vec<String>) -> String {
     let mut cmd = Command::new("git");
@@ -43,9 +52,19 @@ fn confirm(msg: &str) -> bool {
     input == "y" || input == "Y"
 }
 
-fn main() {
+fn get_protected_branches(config: &Config) -> HashSet<String> {
     let mut protected_branches : HashSet<String> = HashSet::new();
     protected_branches.insert("master".to_string());
+    for branch in &config.excluded {
+        protected_branches.insert(branch.to_string());
+    }
+    protected_branches
+}
+
+fn main() {
+    let config = Config::from_args();
+
+    let protected_branches = get_protected_branches(&config);
 
     let branches = list_branches([].to_vec());
     let mut to_delete : HashMap<String, HashSet<String>> = HashMap::new();
