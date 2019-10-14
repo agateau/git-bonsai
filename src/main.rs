@@ -45,7 +45,7 @@ fn read_line() -> String {
 
 fn confirm(msg: &str) -> bool {
     print!("{} ", msg);
-    stdout().flush();
+    stdout().flush().expect("Failed to flush");
 
     let input = read_line();
 
