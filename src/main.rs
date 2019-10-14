@@ -6,7 +6,7 @@ use structopt::StructOpt;
 /// Keep a git repository clean and tidy.
 #[derive(StructOpt)]
 struct Config {
-    /// Branches to exclude (in addition to master)
+    /// Branches to protect from suppression (in addition to master)
     #[structopt(short="x", long)]
     excluded: Vec<String>,
 }
