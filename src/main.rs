@@ -23,24 +23,14 @@ fn get_protected_branches(config: &Config) -> HashSet<String> {
     protected_branches
 }
 
-fn runapp() -> i32 {
-    let config = Config::from_args();
-
-    let current_branch = match git::get_current_branch() {
-        Some(x) => x,
-        None => {
-            log_error("No current branch");
-            return 1;
-        }
-    };
-
+fn remove_merged_branches(config: &Config) -> Result<(), i32> {
     let protected_branches = get_protected_branches(&config);
 
     let branches = match git::list_branches() {
         Ok(x) => x,
         Err(x) => {
             log_error("Failed to list branches");
-            return x;
+            return Err(x);
         }
     };
     let mut to_delete : HashMap<String, HashSet<String>> = HashMap::new();
@@ -49,7 +39,7 @@ fn runapp() -> i32 {
             Ok(x) => x,
             Err(x) => {
                 log_error("Failed to list merged branches");
-                return x;
+                return Err(x);
             }
         };
         for merged_branch in merged_branches {
@@ -77,7 +67,7 @@ fn runapp() -> i32 {
 
     if to_delete.is_empty() {
         println!("No deletable branches");
-        return 0;
+        return Ok(());
     }
 
     println!("Deletable branches:\n");
@@ -90,7 +80,7 @@ fn runapp() -> i32 {
     }
 
     if !tui::confirm("Delete them?") {
-        return 0;
+        return Ok(());
     }
     for (branch, contained_in) in &to_delete {
         log_info(&format!("Deleting {}", branch));
@@ -102,6 +92,23 @@ fn runapp() -> i32 {
         if git::delete_branch(branch).is_err() {
             log_warning("Failed to delete branch");
         }
+    }
+    Ok(())
+}
+
+fn runapp() -> i32 {
+    let config = Config::from_args();
+
+    let current_branch = match git::get_current_branch() {
+        Some(x) => x,
+        None => {
+            log_error("No current branch");
+            return 1;
+        }
+    };
+
+    if let Err(x) = remove_merged_branches(&config) {
+        return x;
     }
 
     match git::checkout(&current_branch) {
