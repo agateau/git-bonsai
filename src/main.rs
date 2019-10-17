@@ -4,7 +4,7 @@ use structopt::StructOpt;
 mod git;
 mod tui;
 
-use tui::{log_warning,log_error};
+use tui::{log_warning,log_error,log_info};
 
 /// Keep a git repository clean and tidy.
 #[derive(StructOpt)]
@@ -93,7 +93,7 @@ fn runapp() -> i32 {
         return 0;
     }
     for (branch, contained_in) in &to_delete {
-        println!("Deleting {}", branch);
+        log_info(&format!("Deleting {}", branch));
         let container = contained_in.iter().next().unwrap();
         if git::checkout(container).is_err() {
             log_warning("Failed to checkout branch");

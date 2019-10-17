@@ -22,3 +22,7 @@ pub fn log_warning(msg: &str) {
 pub fn log_error(msg: &str) {
     println!("Error: {}", msg);
 }
+
+pub fn log_info(msg: &str) {
+    println!("Info: {}", msg);
+}
