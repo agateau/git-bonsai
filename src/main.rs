@@ -27,6 +27,14 @@ fn confirm(msg: &str) -> bool {
     input == "y" || input == "Y"
 }
 
+fn log_warning(msg: &str) {
+    println!("Warning: {}", msg);
+}
+
+fn log_error(msg: &str) {
+    println!("Error: {}", msg);
+}
+
 fn get_protected_branches(config: &Config) -> HashSet<String> {
     let mut protected_branches : HashSet<String> = HashSet::new();
     protected_branches.insert("master".to_string());
@@ -36,15 +44,35 @@ fn get_protected_branches(config: &Config) -> HashSet<String> {
     protected_branches
 }
 
-fn main() {
+fn runapp() -> i32 {
     let config = Config::from_args();
+
+    let current_branch = match git::get_current_branch() {
+        Some(x) => x,
+        None => {
+            log_error("No current branch");
+            return 1;
+        }
+    };
 
     let protected_branches = get_protected_branches(&config);
 
-    let branches = git::list_branches();
+    let branches = match git::list_branches() {
+        Ok(x) => x,
+        Err(x) => {
+            log_error("Failed to list branches");
+            return x;
+        }
+    };
     let mut to_delete : HashMap<String, HashSet<String>> = HashMap::new();
     for branch in branches {
-        let merged_branches = git::list_merged_branches(&branch);
+        let merged_branches = match git::list_merged_branches(&branch) {
+            Ok(x) => x,
+            Err(x) => {
+                log_error("Failed to list merged branches");
+                return x;
+            }
+        };
         for merged_branch in merged_branches {
             if protected_branches.contains(&merged_branch) {
                 continue;
@@ -70,7 +98,7 @@ fn main() {
 
     if to_delete.is_empty() {
         println!("No deletable branches");
-        return;
+        return 0;
     }
 
     println!("Deletable branches:\n");
@@ -83,12 +111,26 @@ fn main() {
     }
 
     if !confirm("Delete them?") {
-        return;
+        return 0;
     }
     for (branch, contained_in) in &to_delete {
         println!("Deleting {}", branch);
         let container = contained_in.iter().next().unwrap();
-        git::checkout(container);
-        git::delete_branch(branch);
+        if git::checkout(container).is_err() {
+            log_warning("Failed to checkout branch");
+            continue;
+        }
+        if git::delete_branch(branch).is_err() {
+            log_warning("Failed to delete branch");
+        }
     }
+
+    match git::checkout(&current_branch) {
+        Ok(()) => 0,
+        Err(x) => x,
+    }
+}
+
+fn main() {
+    ::std::process::exit(runapp());
 }
