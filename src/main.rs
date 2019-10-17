@@ -1,8 +1,10 @@
 use std::collections::{HashMap,HashSet};
-use std::io::{stdin,stdout,Write};
 use structopt::StructOpt;
 
 mod git;
+mod tui;
+
+use tui::{log_warning,log_error};
 
 /// Keep a git repository clean and tidy.
 #[derive(StructOpt)]
@@ -10,29 +12,6 @@ struct Config {
     /// Branches to protect from suppression (in addition to master)
     #[structopt(short="x", long)]
     excluded: Vec<String>,
-}
-
-fn read_line() -> String {
-    let mut input = String::new();
-    stdin().read_line(&mut input).unwrap();
-    input.trim().to_string()
-}
-
-fn confirm(msg: &str) -> bool {
-    print!("{} ", msg);
-    stdout().flush().expect("Failed to flush");
-
-    let input = read_line();
-
-    input == "y" || input == "Y"
-}
-
-fn log_warning(msg: &str) {
-    println!("Warning: {}", msg);
-}
-
-fn log_error(msg: &str) {
-    println!("Error: {}", msg);
 }
 
 fn get_protected_branches(config: &Config) -> HashSet<String> {
@@ -110,7 +89,7 @@ fn runapp() -> i32 {
         println!();
     }
 
-    if !confirm("Delete them?") {
+    if !tui::confirm("Delete them?") {
         return 0;
     }
     for (branch, contained_in) in &to_delete {
