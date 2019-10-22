@@ -96,6 +96,33 @@ fn remove_merged_branches(config: &Config) -> Result<(), i32> {
     Ok(())
 }
 
+fn fetch_branches() -> Result<(), i32> {
+    git::fetch()
+}
+
+fn update_tracking_branches() -> Result<(), i32> {
+    let branches = match git::list_tracking_branches() {
+        Ok(x) => x,
+        Err(x) => {
+            log_error("Failed to list tracking branches");
+            return Err(x);
+        }
+    };
+
+    for branch in branches {
+        log_info(&format!("Updating {}", branch));
+        if let Err(x) = git::checkout(&branch) {
+            log_error("Failed to checkout branch");
+            return Err(x);
+        }
+        if let Err(x) = git::pull() {
+            log_error("Failed to pull branch");
+            return Err(x);
+        }
+    }
+    Ok(())
+}
+
 fn runapp() -> i32 {
     let config = Config::from_args();
 
@@ -106,6 +133,14 @@ fn runapp() -> i32 {
             return 1;
         }
     };
+
+    if let Err(x) = fetch_branches() {
+        return x;
+    }
+
+    if let Err(x) = update_tracking_branches() {
+        return x;
+    }
 
     if let Err(x) = remove_merged_branches(&config) {
         return x;

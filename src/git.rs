@@ -2,6 +2,7 @@ use std::process::Command;
 
 fn git(subcommand: &str, args: Vec<String>) -> Result<String, i32> {
     let mut cmd = Command::new("git");
+    cmd.env("LANG", "C");
     cmd.arg(subcommand);
     for arg in args {
         cmd.arg(arg);
@@ -22,6 +23,13 @@ fn git(subcommand: &str, args: Vec<String>) -> Result<String, i32> {
     }
     let out = String::from_utf8(output.stdout).expect("Failed to decode command stdout");
     Ok(out)
+}
+
+pub fn fetch() -> Result<(), i32> {
+    match git("fetch", vec!["--prune".to_string()]) {
+        Ok(_x) => Ok(()),
+        Err(x) => Err(x),
+    }
 }
 
 pub fn list_branches() -> Result<Vec<String>, i32> {
@@ -45,6 +53,21 @@ fn list_branches_internal(args: Vec<String>) -> Result<Vec<String>, i32> {
 
 pub fn list_merged_branches(branch: &str) -> Result<Vec<String>, i32> {
     list_branches_internal(vec!["--merged".to_string(), branch.to_string()])
+}
+
+pub fn list_tracking_branches() -> Result<Vec<String>, i32> {
+    let mut branches : Vec<String> = Vec::new();
+    let lines = match list_branches_internal(vec!["-vv".to_string()]) {
+        Ok(x) => x,
+        Err(x) => return Err(x),
+    };
+    for line in lines {
+        if line.contains("[origin/") && !line.contains(": gone]") {
+            let branch = line.split(" ").next();
+            branches.push(branch.unwrap().to_string());
+        }
+    }
+    Ok(branches)
 }
 
 pub fn checkout(branch: &str) -> Result<(), i32> {
@@ -72,4 +95,11 @@ pub fn get_current_branch() -> Option<String> {
         }
     }
     None
+}
+
+pub fn pull() -> Result<(), i32> {
+    match git("pull", [].to_vec()) {
+        Ok(_x) => Ok(()),
+        Err(x) => Err(x),
+    }
 }
