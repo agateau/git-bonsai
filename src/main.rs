@@ -96,7 +96,8 @@ fn remove_merged_branches(config: &Config) -> Result<(), i32> {
     Ok(())
 }
 
-fn fetch_branches() -> Result<(), i32> {
+fn fetch_changes() -> Result<(), i32> {
+    log_info("Fetching changes");
     git::fetch()
 }
 
@@ -115,9 +116,10 @@ fn update_tracking_branches() -> Result<(), i32> {
             log_error("Failed to checkout branch");
             return Err(x);
         }
-        if let Err(x) = git::pull() {
-            log_error("Failed to pull branch");
-            return Err(x);
+        if let Err(_x) = git::update_branch() {
+            log_warning("Failed to update branch");
+            // This is not wrong, it can happen if the branches have diverged
+            // let's continue
         }
     }
     Ok(())
@@ -134,7 +136,7 @@ fn runapp() -> i32 {
         }
     };
 
-    if let Err(x) = fetch_branches() {
+    if let Err(x) = fetch_changes() {
         return x;
     }
 

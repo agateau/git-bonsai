@@ -97,8 +97,8 @@ pub fn get_current_branch() -> Option<String> {
     None
 }
 
-pub fn pull() -> Result<(), i32> {
-    match git("pull", [].to_vec()) {
+pub fn update_branch() -> Result<(), i32> {
+    match git("merge", vec!["--ff-only".to_string(), "FETCH_HEAD".to_string()]) {
         Ok(_x) => Ok(()),
         Err(x) => Err(x),
     }
