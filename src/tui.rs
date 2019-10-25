@@ -1,4 +1,5 @@
 use std::io::{stdin,stdout,Write};
+use ansi_term::Color::{Blue,Red,Yellow};
 
 pub fn read_line() -> String {
     let mut input = String::new();
@@ -16,13 +17,13 @@ pub fn confirm(msg: &str) -> bool {
 }
 
 pub fn log_warning(msg: &str) {
-    println!("Warning: {}", msg);
+    println!("{}", Yellow.paint(format!("Warning: {}", msg)));
 }
 
 pub fn log_error(msg: &str) {
-    println!("Error: {}", msg);
+    println!("{}", Red.paint(format!("Error: {}", msg)));
 }
 
 pub fn log_info(msg: &str) {
-    println!("Info: {}", msg);
+    println!("{}", Blue.paint(format!("Info: {}", msg)));
 }

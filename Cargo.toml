@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 structopt = "0.2.10"
+ansi_term = "0.12"
