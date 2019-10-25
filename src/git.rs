@@ -1,5 +1,28 @@
 use std::process::Command;
 
+/**
+ * Restores the current git branch when dropped
+ * Assumes we are on a real branch
+ */
+pub struct BranchRestorer {
+    branch: String
+}
+
+impl BranchRestorer {
+    pub fn new() -> BranchRestorer {
+        let current_branch = get_current_branch().expect("Can't get current branch");
+        BranchRestorer { branch: current_branch.to_string() }
+    }
+}
+
+impl Drop for BranchRestorer {
+    fn drop(&mut self) {
+        if let Err(_x) = checkout(&self.branch) {
+            println!("Failed to restore original branch {}", self.branch);
+        }
+    }
+}
+
 fn git(subcommand: &str, args: Vec<String>) -> Result<String, i32> {
     let mut cmd = Command::new("git");
     cmd.env("LANG", "C");

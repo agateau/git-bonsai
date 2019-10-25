@@ -82,6 +82,8 @@ fn remove_merged_branches(config: &Config) -> Result<(), i32> {
     if !tui::confirm("Delete them?") {
         return Ok(());
     }
+
+    let _restorer = git::BranchRestorer::new();
     for (branch, contained_in) in &to_delete {
         log_info(&format!("Deleting {}", branch));
         let container = contained_in.iter().next().unwrap();
@@ -110,6 +112,7 @@ fn update_tracking_branches() -> Result<(), i32> {
         }
     };
 
+    let _restorer = git::BranchRestorer::new();
     for branch in branches {
         log_info(&format!("Updating {}", branch));
         if let Err(x) = git::checkout(&branch) {
@@ -125,16 +128,20 @@ fn update_tracking_branches() -> Result<(), i32> {
     Ok(())
 }
 
+fn is_working_tree_clean() -> bool {
+    if git::get_current_branch() == None {
+        log_error("No current branch");
+        return false;
+    }
+    true
+}
+
 fn runapp() -> i32 {
     let config = Config::from_args();
 
-    let current_branch = match git::get_current_branch() {
-        Some(x) => x,
-        None => {
-            log_error("No current branch");
-            return 1;
-        }
-    };
+    if !is_working_tree_clean() {
+        return 1;
+    }
 
     if let Err(x) = fetch_changes() {
         return x;
@@ -147,11 +154,7 @@ fn runapp() -> i32 {
     if let Err(x) = remove_merged_branches(&config) {
         return x;
     }
-
-    match git::checkout(&current_branch) {
-        Ok(()) => 0,
-        Err(x) => x,
-    }
+    0
 }
 
 fn main() {
