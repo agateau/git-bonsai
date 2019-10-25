@@ -133,7 +133,19 @@ fn is_working_tree_clean() -> bool {
         log_error("No current branch");
         return false;
     }
-    true
+    match git::has_changes() {
+        Ok(has_changes) => {
+            if has_changes {
+                log_error("Can't work in a tree with uncommitted changes");
+                return false;
+            }
+            true
+        },
+        Err(()) => {
+            log_error("Failed to get working tree status");
+            false
+        }
+    }
 }
 
 fn runapp() -> i32 {

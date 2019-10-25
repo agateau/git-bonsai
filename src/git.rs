@@ -129,3 +129,12 @@ pub fn update_branch() -> Result<(), i32> {
         Err(x) => Err(x),
     }
 }
+
+pub fn has_changes() -> Result<bool, ()> {
+    let stdout = git("status", vec!["--short".to_string()]);
+    if stdout.is_err() {
+        return Err(());
+    }
+    let has_changes = !stdout.unwrap().is_empty();
+    Ok(has_changes)
+}
