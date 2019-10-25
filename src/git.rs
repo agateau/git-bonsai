@@ -98,8 +98,11 @@ pub fn get_current_branch() -> Option<String> {
 }
 
 pub fn update_branch() -> Result<(), i32> {
-    match git("merge", vec!["--ff-only".to_string(), "FETCH_HEAD".to_string()]) {
-        Ok(_x) => Ok(()),
+    match git("merge", vec!["--ff-only".to_string()]) {
+        Ok(out) => {
+            println!("{}", out);
+            Ok(())
+        },
         Err(x) => Err(x),
     }
 }
