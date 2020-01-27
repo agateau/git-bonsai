@@ -23,16 +23,10 @@ fn get_protected_branches(config: &Config) -> HashSet<String> {
     protected_branches
 }
 
-fn remove_merged_branches(config: &Config) -> Result<(), i32> {
+/// Returns a map of branch_to_delete => (branches containing it)
+fn get_deletable_branches(config: &Config, branches: &Vec<String>) -> Result<HashMap<String, HashSet<String>>, i32> {
     let protected_branches = get_protected_branches(&config);
 
-    let branches = match git::list_branches() {
-        Ok(x) => x,
-        Err(x) => {
-            log_error("Failed to list branches");
-            return Err(x);
-        }
-    };
     let mut to_delete : HashMap<String, HashSet<String>> = HashMap::new();
     for branch in branches {
         let merged_branches = match git::list_merged_branches(&branch) {
@@ -46,13 +40,30 @@ fn remove_merged_branches(config: &Config) -> Result<(), i32> {
             if protected_branches.contains(&merged_branch) {
                 continue;
             }
-            if branch == merged_branch {
+            if branch == &merged_branch {
                 continue;
             }
             let entry = to_delete.entry(merged_branch).or_insert(HashSet::new());
             (*entry).insert(branch.clone());
         }
     }
+    Ok(to_delete)
+}
+
+fn remove_merged_branches(config: &Config) -> Result<(), i32> {
+    let branches = match git::list_branches() {
+        Ok(x) => x,
+        Err(x) => {
+            log_error("Failed to list branches");
+            return Err(x);
+        }
+    };
+    let mut to_delete = match get_deletable_branches(&config, &branches) {
+        Ok(x) => x,
+        Err(x) => {
+            return Err(x);
+        }
+    };
 
     // Remove deletable branches from to_delete values
     let mut deletable_branches : HashSet<String> = HashSet::new();
