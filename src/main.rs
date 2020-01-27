@@ -50,6 +50,14 @@ fn get_deletable_branches(config: &Config, branches: &Vec<String>) -> Result<Has
     Ok(to_delete)
 }
 
+fn vec_for_map_keys<K: Clone, V>(map: &HashMap<K, V>) -> Vec<K> {
+    map.keys().map(|x| x.clone()).collect()
+}
+
+fn select_branches_to_delete(branches: &Vec<String>) -> Vec<String> {
+    tui::select("Select branches to delete", &branches)
+}
+
 fn remove_merged_branches(config: &Config) -> Result<(), i32> {
     let branches = match git::list_branches() {
         Ok(x) => x,
@@ -83,20 +91,22 @@ fn remove_merged_branches(config: &Config) -> Result<(), i32> {
 
     println!("Deletable branches:\n");
     for (branch, contained_in) in &to_delete {
-        println!("{}, contained in:", branch);
+        println!("- {}, contained in:", branch);
         for br in contained_in {
-            println!("  {}", br);
+            println!("    {}", br);
         }
         println!();
     }
 
-    if !tui::confirm("Delete them?") {
+    let selected_branches = select_branches_to_delete(&vec_for_map_keys(&to_delete));
+    if selected_branches.is_empty() {
         return Ok(());
     }
 
     let _restorer = git::BranchRestorer::new();
-    for (branch, contained_in) in &to_delete {
+    for branch in &selected_branches {
         log_info(&format!("Deleting {}", branch));
+        let contained_in = &to_delete[branch];
         let container = contained_in.iter().next().unwrap();
         if git::checkout(container).is_err() {
             log_warning("Failed to checkout branch");
