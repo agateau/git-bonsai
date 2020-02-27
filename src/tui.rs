@@ -1,17 +1,17 @@
-use ansi_term::Color::{Blue,Red,Yellow};
+use console::style;
 
 use dialoguer::{theme::ColorfulTheme, Checkboxes};
 
 pub fn log_warning(msg: &str) {
-    println!("{}", Yellow.paint(format!("Warning: {}", msg)));
+    println!("{}", style(format!("Warning: {}", msg)).yellow());
 }
 
 pub fn log_error(msg: &str) {
-    println!("{}", Red.paint(format!("Error: {}", msg)));
+    println!("{}", style(format!("Error: {}", msg)).red());
 }
 
 pub fn log_info(msg: &str) {
-    println!("{}", Blue.paint(format!("Info: {}", msg)));
+    println!("{}", style(format!("Info: {}", msg)).blue());
 }
 
 pub fn select(msg: &str, items: &Vec<String>) -> Vec<String> {
