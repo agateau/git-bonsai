@@ -14,15 +14,13 @@ pub fn log_info(msg: &str) {
     println!("{}", style(format!("Info: {}", msg)).blue());
 }
 
-pub fn select(msg: &str, items: &Vec<String>) -> Vec<String> {
+pub fn select(msg: &str, items: &Vec<String>) -> Vec<usize> {
     let checked_items : Vec<(String, bool)> = items.iter()
         .map(|x| (x.clone(), true)).collect();
 
-    let selections = Checkboxes::with_theme(&ColorfulTheme::default())
+    Checkboxes::with_theme(&ColorfulTheme::default())
         .with_prompt(msg)
         .items_checked(&checked_items[..])
         .interact()
-        .unwrap();
-
-    selections.iter().map(|&x| items[x].clone()).collect::<Vec<String>>()
+        .unwrap()
 }

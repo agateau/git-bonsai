@@ -50,12 +50,22 @@ fn get_deletable_branches(config: &Config, branches: &Vec<String>) -> Result<Has
     Ok(to_delete)
 }
 
-fn vec_for_map_keys<K: Clone, V>(map: &HashMap<K, V>) -> Vec<K> {
-    map.keys().map(|x| x.clone()).collect()
+fn format_select_item(branch: &str, containers: &HashSet<String>) -> String {
+    let container_str = containers.iter()
+        .map(|x| format!("      - {}", x))
+        .collect::<Vec<String>>().join("\n");
+
+    format!("{}, contained in:\n{} \n", branch, container_str)
 }
 
-fn select_branches_to_delete(branches: &Vec<String>) -> Vec<String> {
-    tui::select("Select branches to delete", &branches)
+fn select_branches_to_delete(to_delete: &HashMap<String, HashSet<String>>) -> Vec<String> {
+    let (branches, select_items) : (Vec<String>, Vec<String>) = to_delete.iter()
+        .map(|(key, value)| (key.to_owned(), format_select_item(key, value)))
+        .unzip();
+
+    let selections = tui::select("Select branches to delete", &select_items);
+
+    selections.iter().map(|&x| branches[x].clone()).collect::<Vec<String>>()
 }
 
 fn remove_merged_branches(config: &Config) -> Result<(), i32> {
@@ -89,16 +99,7 @@ fn remove_merged_branches(config: &Config) -> Result<(), i32> {
         return Ok(());
     }
 
-    println!("Deletable branches:\n");
-    for (branch, contained_in) in &to_delete {
-        println!("- {}, contained in:", branch);
-        for br in contained_in {
-            println!("    {}", br);
-        }
-        println!();
-    }
-
-    let selected_branches = select_branches_to_delete(&vec_for_map_keys(&to_delete));
+    let selected_branches = select_branches_to_delete(&to_delete);
     if selected_branches.is_empty() {
         return Ok(());
     }
