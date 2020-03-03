@@ -4,6 +4,7 @@ use structopt::StructOpt;
 mod git;
 mod tui;
 
+use git::Repository;
 use tui::{log_warning,log_error,log_info};
 
 /// Keep a git repository clean and tidy.
@@ -24,12 +25,12 @@ fn get_protected_branches(config: &Config) -> HashSet<String> {
 }
 
 /// Returns a map of branch_to_delete => (branches containing it)
-fn get_deletable_branches(config: &Config, branches: &Vec<String>) -> Result<HashMap<String, HashSet<String>>, i32> {
+fn get_deletable_branches(config: &Config, repo: &Repository, branches: &Vec<String>) -> Result<HashMap<String, HashSet<String>>, i32> {
     let protected_branches = get_protected_branches(&config);
 
     let mut to_delete : HashMap<String, HashSet<String>> = HashMap::new();
     for branch in branches {
-        let merged_branches = match git::list_merged_branches(&branch) {
+        let merged_branches = match repo.list_merged_branches(&branch) {
             Ok(x) => x,
             Err(x) => {
                 log_error("Failed to list merged branches");
@@ -68,15 +69,15 @@ fn select_branches_to_delete(to_delete: &HashMap<String, HashSet<String>>) -> Ve
     selections.iter().map(|&x| branches[x].clone()).collect::<Vec<String>>()
 }
 
-fn remove_merged_branches(config: &Config) -> Result<(), i32> {
-    let branches = match git::list_branches() {
+fn remove_merged_branches(config: &Config, repo: &Repository) -> Result<(), i32> {
+    let branches = match repo.list_branches() {
         Ok(x) => x,
         Err(x) => {
             log_error("Failed to list branches");
             return Err(x);
         }
     };
-    let mut to_delete = match get_deletable_branches(&config, &branches) {
+    let mut to_delete = match get_deletable_branches(&config, &repo, &branches) {
         Ok(x) => x,
         Err(x) => {
             return Err(x);
@@ -104,29 +105,29 @@ fn remove_merged_branches(config: &Config) -> Result<(), i32> {
         return Ok(());
     }
 
-    let _restorer = git::BranchRestorer::new();
+    let _restorer = git::BranchRestorer::new(&repo);
     for branch in &selected_branches {
         log_info(&format!("Deleting {}", branch));
         let contained_in = &to_delete[branch];
         let container = contained_in.iter().next().unwrap();
-        if git::checkout(container).is_err() {
+        if repo.checkout(container).is_err() {
             log_warning("Failed to checkout branch");
             continue;
         }
-        if git::delete_branch(branch).is_err() {
+        if repo.delete_branch(branch).is_err() {
             log_warning("Failed to delete branch");
         }
     }
     Ok(())
 }
 
-fn fetch_changes() -> Result<(), i32> {
+fn fetch_changes(repo: &Repository) -> Result<(), i32> {
     log_info("Fetching changes");
-    git::fetch()
+    repo.fetch()
 }
 
-fn update_tracking_branches() -> Result<(), i32> {
-    let branches = match git::list_tracking_branches() {
+fn update_tracking_branches(repo: &Repository) -> Result<(), i32> {
+    let branches = match repo.list_tracking_branches() {
         Ok(x) => x,
         Err(x) => {
             log_error("Failed to list tracking branches");
@@ -134,14 +135,14 @@ fn update_tracking_branches() -> Result<(), i32> {
         }
     };
 
-    let _restorer = git::BranchRestorer::new();
+    let _restorer = git::BranchRestorer::new(&repo);
     for branch in branches {
         log_info(&format!("Updating {}", branch));
-        if let Err(x) = git::checkout(&branch) {
+        if let Err(x) = repo.checkout(&branch) {
             log_error("Failed to checkout branch");
             return Err(x);
         }
-        if let Err(_x) = git::update_branch() {
+        if let Err(_x) = repo.update_branch() {
             log_warning("Failed to update branch");
             // This is not wrong, it can happen if the branches have diverged
             // let's continue
@@ -150,12 +151,12 @@ fn update_tracking_branches() -> Result<(), i32> {
     Ok(())
 }
 
-fn is_working_tree_clean() -> bool {
-    if git::get_current_branch() == None {
+fn is_working_tree_clean(repo: &Repository) -> bool {
+    if repo.get_current_branch() == None {
         log_error("No current branch");
         return false;
     }
-    match git::has_changes() {
+    match repo.has_changes() {
         Ok(has_changes) => {
             if has_changes {
                 log_error("Can't work in a tree with uncommitted changes");
@@ -173,19 +174,21 @@ fn is_working_tree_clean() -> bool {
 fn runapp() -> i32 {
     let config = Config::from_args();
 
-    if !is_working_tree_clean() {
+    let repo = Repository::new(".");
+
+    if !is_working_tree_clean(&repo) {
         return 1;
     }
 
-    if let Err(x) = fetch_changes() {
+    if let Err(x) = fetch_changes(&repo) {
         return x;
     }
 
-    if let Err(x) = update_tracking_branches() {
+    if let Err(x) = update_tracking_branches(&repo) {
         return x;
     }
 
-    if let Err(x) = remove_merged_branches(&config) {
+    if let Err(x) = remove_merged_branches(&config, &repo) {
         return x;
     }
     0

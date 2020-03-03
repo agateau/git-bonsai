@@ -4,137 +4,181 @@ use std::process::Command;
  * Restores the current git branch when dropped
  * Assumes we are on a real branch
  */
-pub struct BranchRestorer {
+pub struct BranchRestorer<'a> {
+    repository: &'a Repository,
     branch: String
 }
 
-impl BranchRestorer {
-    pub fn new() -> BranchRestorer {
-        let current_branch = get_current_branch().expect("Can't get current branch");
-        BranchRestorer { branch: current_branch.to_string() }
+impl BranchRestorer<'_> {
+    pub fn new(repo: &Repository) -> BranchRestorer {
+        let current_branch = repo.get_current_branch().expect("Can't get current branch");
+        BranchRestorer { repository: &repo, branch: current_branch.to_string() }
     }
 }
 
-impl Drop for BranchRestorer {
+impl Drop for BranchRestorer<'_> {
     fn drop(&mut self) {
-        if let Err(_x) = checkout(&self.branch) {
+        if let Err(_x) = self.repository.checkout(&self.branch) {
             println!("Failed to restore original branch {}", self.branch);
         }
     }
 }
 
-fn git(subcommand: &str, args: Vec<String>) -> Result<String, i32> {
-    let mut cmd = Command::new("git");
-    cmd.env("LANG", "C");
-    cmd.arg(subcommand);
-    for arg in args {
-        cmd.arg(arg);
+pub struct Repository {
+    dir: String
+}
+
+impl Repository {
+    pub fn new(dir: &str) -> Repository {
+        Repository { dir: dir.to_string() }
     }
-    let output = match cmd.output() {
-        Ok(x) => x,
-        Err(_x) => {
-            println!("Failed to execute process");
-            return Err(-1);
-        },
-    };
-    if !output.status.success() {
-        println!("{}", String::from_utf8(output.stderr).expect("Failed to decode command stderr"));
-        return match output.status.code() {
-            Some(code) => Err(code),
-            None => Err(-1)
+
+    pub fn git(&self, subcommand: &str, args: Vec<String>) -> Result<String, i32> {
+        let mut cmd = Command::new("git");
+        cmd.current_dir(&self.dir);
+        cmd.env("LANG", "C");
+        cmd.arg(subcommand);
+        for arg in args {
+            cmd.arg(arg);
+        }
+        let output = match cmd.output() {
+            Ok(x) => x,
+            Err(_x) => {
+                println!("Failed to execute process");
+                return Err(-1);
+            },
         };
-    }
-    let out = String::from_utf8(output.stdout).expect("Failed to decode command stdout");
-    Ok(out)
-}
-
-pub fn fetch() -> Result<(), i32> {
-    match git("fetch", vec!["--prune".to_string()]) {
-        Ok(_x) => Ok(()),
-        Err(x) => Err(x),
-    }
-}
-
-pub fn list_branches() -> Result<Vec<String>, i32> {
-    list_branches_internal([].to_vec())
-}
-
-fn list_branches_internal(args: Vec<String>) -> Result<Vec<String>, i32> {
-    let mut branches : Vec<String> = Vec::new();
-
-    let stdout = match git("branch", args) {
-        Ok(x) => x,
-        Err(x) => return Err(x),
-    };
-    for line in stdout.lines() {
-        let branch = line.get(2..).expect("Invalid branch name");
-        branches.push(branch.to_string());
+        if !output.status.success() {
+            println!("{}", String::from_utf8(output.stderr).expect("Failed to decode command stderr"));
+            return match output.status.code() {
+                Some(code) => Err(code),
+                None => Err(-1)
+            };
+        }
+        let out = String::from_utf8(output.stdout).expect("Failed to decode command stdout");
+        Ok(out)
     }
 
-    Ok(branches)
-}
-
-pub fn list_merged_branches(branch: &str) -> Result<Vec<String>, i32> {
-    list_branches_internal(vec!["--merged".to_string(), branch.to_string()])
-}
-
-pub fn list_tracking_branches() -> Result<Vec<String>, i32> {
-    let mut branches : Vec<String> = Vec::new();
-    let lines = match list_branches_internal(vec!["-vv".to_string()]) {
-        Ok(x) => x,
-        Err(x) => return Err(x),
-    };
-    for line in lines {
-        if line.contains("[origin/") && !line.contains(": gone]") {
-            let branch = line.split(" ").next();
-            branches.push(branch.unwrap().to_string());
+    pub fn fetch(&self) -> Result<(), i32> {
+        match self.git("fetch", vec!["--prune".to_string()]) {
+            Ok(_x) => Ok(()),
+            Err(x) => Err(x),
         }
     }
-    Ok(branches)
-}
 
-pub fn checkout(branch: &str) -> Result<(), i32> {
-    match git("checkout", vec![branch.to_string()]) {
-        Ok(_x) => Ok(()),
-        Err(x) => Err(x),
+    pub fn list_branches(&self) -> Result<Vec<String>, i32> {
+        self.list_branches_internal([].to_vec())
     }
-}
 
-pub fn delete_branch(branch: &str) -> Result<(), i32> {
-    match git("branch", vec!["-d".to_string(), branch.to_string()]) {
-        Ok(_x) => Ok(()),
-        Err(x) => Err(x),
-    }
-}
+    fn list_branches_internal(&self, args: Vec<String>) -> Result<Vec<String>, i32> {
+        let mut branches : Vec<String> = Vec::new();
 
-pub fn get_current_branch() -> Option<String> {
-    let stdout = git("branch", [].to_vec());
-    if stdout.is_err() {
-        return None;
+        let stdout = match self.git("branch", args) {
+            Ok(x) => x,
+            Err(x) => return Err(x),
+        };
+        for line in stdout.lines() {
+            let branch = line.get(2..).expect("Invalid branch name");
+            branches.push(branch.to_string());
+        }
+
+        Ok(branches)
     }
-    for line in stdout.unwrap().lines() {
-        if line.chars().nth(0) == Some('*') {
-            return Some(line[2..].to_string());
+
+    pub fn list_merged_branches(&self, branch: &str) -> Result<Vec<String>, i32> {
+        self.list_branches_internal(vec!["--merged".to_string(), branch.to_string()])
+    }
+
+    pub fn list_tracking_branches(&self) -> Result<Vec<String>, i32> {
+        let mut branches : Vec<String> = Vec::new();
+        let lines = match self.list_branches_internal(vec!["-vv".to_string()]) {
+            Ok(x) => x,
+            Err(x) => return Err(x),
+        };
+        for line in lines {
+            if line.contains("[origin/") && !line.contains(": gone]") {
+                let branch = line.split(" ").next();
+                branches.push(branch.unwrap().to_string());
+            }
+        }
+        Ok(branches)
+    }
+
+    pub fn checkout(&self, branch: &str) -> Result<(), i32> {
+        match self.git("checkout", vec![branch.to_string()]) {
+            Ok(_x) => Ok(()),
+            Err(x) => Err(x),
         }
     }
-    None
-}
 
-pub fn update_branch() -> Result<(), i32> {
-    match git("merge", vec!["--ff-only".to_string()]) {
-        Ok(out) => {
-            println!("{}", out);
-            Ok(())
-        },
-        Err(x) => Err(x),
+    pub fn delete_branch(&self, branch: &str) -> Result<(), i32> {
+        match self.git("branch", vec!["-d".to_string(), branch.to_string()]) {
+            Ok(_x) => Ok(()),
+            Err(x) => Err(x),
+        }
+    }
+
+    pub fn get_current_branch(&self) -> Option<String> {
+        let stdout = self.git("branch", [].to_vec());
+        if stdout.is_err() {
+            return None;
+        }
+        for line in stdout.unwrap().lines() {
+            if line.chars().nth(0) == Some('*') {
+                return Some(line[2..].to_string());
+            }
+        }
+        None
+    }
+
+    pub fn update_branch(&self) -> Result<(), i32> {
+        match self.git("merge", vec!["--ff-only".to_string()]) {
+            Ok(out) => {
+                println!("{}", out);
+                Ok(())
+            },
+            Err(x) => Err(x),
+        }
+    }
+
+    pub fn has_changes(&self) -> Result<bool, ()> {
+        let stdout = self.git("status", vec!["--short".to_string()]);
+        if stdout.is_err() {
+            return Err(());
+        }
+        let has_changes = !stdout.unwrap().is_empty();
+        Ok(has_changes)
     }
 }
 
-pub fn has_changes() -> Result<bool, ()> {
-    let stdout = git("status", vec!["--short".to_string()]);
-    if stdout.is_err() {
-        return Err(());
+#[cfg(test)]
+mod tests {
+    extern crate assert_cmd;
+    extern crate assert_fs;
+
+    use super::*;
+    use assert_fs::prelude::*;
+
+    fn create_test_repository() -> (assert_fs::TempDir, Repository) {
+        let dir = assert_fs::TempDir::new().unwrap();
+        dir.child("f").touch().unwrap();
+
+        let path_str = dir.path().to_str().unwrap();
+        let repo = Repository::new(path_str);
+
+        repo.git("init", [].to_vec()).expect("init failed");
+        repo.git("add", vec![".".to_string()]).expect("add failed");
+        repo.git("commit", vec!["-m".to_string(), "init".to_string()]).expect("commit failed");
+
+        (dir, repo)
     }
-    let has_changes = !stdout.unwrap().is_empty();
-    Ok(has_changes)
+
+    #[test]
+    fn get_current_branch() {
+        let (_repo_dir, repo) = create_test_repository();
+        assert_eq!(repo.get_current_branch().unwrap(), "master");
+
+        repo.git("checkout", vec!["-b".to_string(), "test".to_string()]).expect("create branch failed");
+        assert_eq!(repo.get_current_branch().unwrap(), "test");
+    }
 }
