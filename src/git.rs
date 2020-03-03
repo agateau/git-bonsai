@@ -33,7 +33,7 @@ impl Repository {
         Repository { dir: dir.to_string() }
     }
 
-    pub fn git(&self, subcommand: &str, args: Vec<String>) -> Result<String, i32> {
+    pub fn git(&self, subcommand: &str, args: &[&str]) -> Result<String, i32> {
         let mut cmd = Command::new("git");
         cmd.current_dir(&self.dir);
         cmd.env("LANG", "C");
@@ -60,17 +60,17 @@ impl Repository {
     }
 
     pub fn fetch(&self) -> Result<(), i32> {
-        match self.git("fetch", vec!["--prune".to_string()]) {
+        match self.git("fetch", &["--prune"]) {
             Ok(_x) => Ok(()),
             Err(x) => Err(x),
         }
     }
 
     pub fn list_branches(&self) -> Result<Vec<String>, i32> {
-        self.list_branches_internal([].to_vec())
+        self.list_branches_internal(&[])
     }
 
-    fn list_branches_internal(&self, args: Vec<String>) -> Result<Vec<String>, i32> {
+    fn list_branches_internal(&self, args: &[&str]) -> Result<Vec<String>, i32> {
         let mut branches : Vec<String> = Vec::new();
 
         let stdout = match self.git("branch", args) {
@@ -86,12 +86,12 @@ impl Repository {
     }
 
     pub fn list_merged_branches(&self, branch: &str) -> Result<Vec<String>, i32> {
-        self.list_branches_internal(vec!["--merged".to_string(), branch.to_string()])
+        self.list_branches_internal(&["--merged", branch])
     }
 
     pub fn list_tracking_branches(&self) -> Result<Vec<String>, i32> {
         let mut branches : Vec<String> = Vec::new();
-        let lines = match self.list_branches_internal(vec!["-vv".to_string()]) {
+        let lines = match self.list_branches_internal(&["-vv"]) {
             Ok(x) => x,
             Err(x) => return Err(x),
         };
@@ -105,21 +105,21 @@ impl Repository {
     }
 
     pub fn checkout(&self, branch: &str) -> Result<(), i32> {
-        match self.git("checkout", vec![branch.to_string()]) {
+        match self.git("checkout", &[branch]) {
             Ok(_x) => Ok(()),
             Err(x) => Err(x),
         }
     }
 
     pub fn delete_branch(&self, branch: &str) -> Result<(), i32> {
-        match self.git("branch", vec!["-d".to_string(), branch.to_string()]) {
+        match self.git("branch", &["-d", branch]) {
             Ok(_x) => Ok(()),
             Err(x) => Err(x),
         }
     }
 
     pub fn get_current_branch(&self) -> Option<String> {
-        let stdout = self.git("branch", [].to_vec());
+        let stdout = self.git("branch", &[]);
         if stdout.is_err() {
             return None;
         }
@@ -132,7 +132,7 @@ impl Repository {
     }
 
     pub fn update_branch(&self) -> Result<(), i32> {
-        match self.git("merge", vec!["--ff-only".to_string()]) {
+        match self.git("merge", &["--ff-only"]) {
             Ok(out) => {
                 println!("{}", out);
                 Ok(())
@@ -142,7 +142,7 @@ impl Repository {
     }
 
     pub fn has_changes(&self) -> Result<bool, ()> {
-        let stdout = self.git("status", vec!["--short".to_string()]);
+        let stdout = self.git("status", &["--short"]);
         if stdout.is_err() {
             return Err(());
         }
@@ -166,9 +166,9 @@ mod tests {
         let path_str = dir.path().to_str().unwrap();
         let repo = Repository::new(path_str);
 
-        repo.git("init", [].to_vec()).expect("init failed");
-        repo.git("add", vec![".".to_string()]).expect("add failed");
-        repo.git("commit", vec!["-m".to_string(), "init".to_string()]).expect("commit failed");
+        repo.git("init", &[]).expect("init failed");
+        repo.git("add", &["."]).expect("add failed");
+        repo.git("commit", &["-m", "init"]).expect("commit failed");
 
         (dir, repo)
     }
@@ -178,7 +178,7 @@ mod tests {
         let (_repo_dir, repo) = create_test_repository();
         assert_eq!(repo.get_current_branch().unwrap(), "master");
 
-        repo.git("checkout", vec!["-b".to_string(), "test".to_string()]).expect("create branch failed");
+        repo.git("checkout", &["-b", "test"]).expect("create branch failed");
         assert_eq!(repo.get_current_branch().unwrap(), "test");
     }
 }
