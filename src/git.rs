@@ -6,13 +6,16 @@ use std::process::Command;
  */
 pub struct BranchRestorer<'a> {
     repository: &'a Repository,
-    branch: String
+    branch: String,
 }
 
 impl BranchRestorer<'_> {
     pub fn new(repo: &Repository) -> BranchRestorer {
         let current_branch = repo.get_current_branch().expect("Can't get current branch");
-        BranchRestorer { repository: &repo, branch: current_branch.to_string() }
+        BranchRestorer {
+            repository: &repo,
+            branch: current_branch.to_string(),
+        }
     }
 }
 
@@ -25,12 +28,14 @@ impl Drop for BranchRestorer<'_> {
 }
 
 pub struct Repository {
-    dir: String
+    dir: String,
 }
 
 impl Repository {
     pub fn new(dir: &str) -> Repository {
-        Repository { dir: dir.to_string() }
+        Repository {
+            dir: dir.to_string(),
+        }
     }
 
     pub fn git(&self, subcommand: &str, args: &[&str]) -> Result<String, i32> {
@@ -46,13 +51,16 @@ impl Repository {
             Err(_x) => {
                 println!("Failed to execute process");
                 return Err(-1);
-            },
+            }
         };
         if !output.status.success() {
-            println!("{}", String::from_utf8(output.stderr).expect("Failed to decode command stderr"));
+            println!(
+                "{}",
+                String::from_utf8(output.stderr).expect("Failed to decode command stderr")
+            );
             return match output.status.code() {
                 Some(code) => Err(code),
-                None => Err(-1)
+                None => Err(-1),
             };
         }
         let out = String::from_utf8(output.stdout).expect("Failed to decode command stdout");
@@ -71,7 +79,7 @@ impl Repository {
     }
 
     fn list_branches_internal(&self, args: &[&str]) -> Result<Vec<String>, i32> {
-        let mut branches : Vec<String> = Vec::new();
+        let mut branches: Vec<String> = Vec::new();
 
         let stdout = match self.git("branch", args) {
             Ok(x) => x,
@@ -90,7 +98,7 @@ impl Repository {
     }
 
     pub fn list_tracking_branches(&self) -> Result<Vec<String>, i32> {
-        let mut branches : Vec<String> = Vec::new();
+        let mut branches: Vec<String> = Vec::new();
         let lines = match self.list_branches_internal(&["-vv"]) {
             Ok(x) => x,
             Err(x) => return Err(x),
@@ -136,7 +144,7 @@ impl Repository {
             Ok(out) => {
                 println!("{}", out);
                 Ok(())
-            },
+            }
             Err(x) => Err(x),
         }
     }
@@ -178,7 +186,8 @@ mod tests {
         let (_repo_dir, repo) = create_test_repository();
         assert_eq!(repo.get_current_branch().unwrap(), "master");
 
-        repo.git("checkout", &["-b", "test"]).expect("create branch failed");
+        repo.git("checkout", &["-b", "test"])
+            .expect("create branch failed");
         assert_eq!(repo.get_current_branch().unwrap(), "test");
     }
 }

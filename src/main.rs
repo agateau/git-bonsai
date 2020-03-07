@@ -1,22 +1,22 @@
-use std::collections::{HashMap,HashSet};
+use std::collections::{HashMap, HashSet};
 use structopt::StructOpt;
 
 mod git;
 mod tui;
 
 use git::Repository;
-use tui::{log_warning,log_error,log_info};
+use tui::{log_error, log_info, log_warning};
 
 /// Keep a git repository clean and tidy.
 #[derive(StructOpt)]
 struct Config {
     /// Branches to protect from suppression (in addition to master)
-    #[structopt(short="x", long)]
+    #[structopt(short = "x", long)]
     excluded: Vec<String>,
 }
 
 fn get_protected_branches(config: &Config) -> HashSet<String> {
-    let mut protected_branches : HashSet<String> = HashSet::new();
+    let mut protected_branches: HashSet<String> = HashSet::new();
     protected_branches.insert("master".to_string());
     for branch in &config.excluded {
         protected_branches.insert(branch.to_string());
@@ -25,10 +25,14 @@ fn get_protected_branches(config: &Config) -> HashSet<String> {
 }
 
 /// Returns a map of branch_to_delete => (branches containing it)
-fn get_deletable_branches(config: &Config, repo: &Repository, branches: &Vec<String>) -> Result<HashMap<String, HashSet<String>>, i32> {
+fn get_deletable_branches(
+    config: &Config,
+    repo: &Repository,
+    branches: &Vec<String>,
+) -> Result<HashMap<String, HashSet<String>>, i32> {
     let protected_branches = get_protected_branches(&config);
 
-    let mut to_delete : HashMap<String, HashSet<String>> = HashMap::new();
+    let mut to_delete: HashMap<String, HashSet<String>> = HashMap::new();
     for branch in branches {
         let merged_branches = match repo.list_merged_branches(&branch) {
             Ok(x) => x,
@@ -52,21 +56,27 @@ fn get_deletable_branches(config: &Config, repo: &Repository, branches: &Vec<Str
 }
 
 fn format_select_item(branch: &str, containers: &HashSet<String>) -> String {
-    let container_str = containers.iter()
+    let container_str = containers
+        .iter()
         .map(|x| format!("      - {}", x))
-        .collect::<Vec<String>>().join("\n");
+        .collect::<Vec<String>>()
+        .join("\n");
 
     format!("{}, contained in:\n{} \n", branch, container_str)
 }
 
 fn select_branches_to_delete(to_delete: &HashMap<String, HashSet<String>>) -> Vec<String> {
-    let (branches, select_items) : (Vec<String>, Vec<String>) = to_delete.iter()
+    let (branches, select_items): (Vec<String>, Vec<String>) = to_delete
+        .iter()
         .map(|(key, value)| (key.to_owned(), format_select_item(key, value)))
         .unzip();
 
     let selections = tui::select("Select branches to delete", &select_items);
 
-    selections.iter().map(|&x| branches[x].clone()).collect::<Vec<String>>()
+    selections
+        .iter()
+        .map(|&x| branches[x].clone())
+        .collect::<Vec<String>>()
 }
 
 fn remove_merged_branches(config: &Config, repo: &Repository) -> Result<(), i32> {
@@ -85,7 +95,7 @@ fn remove_merged_branches(config: &Config, repo: &Repository) -> Result<(), i32>
     };
 
     // Remove deletable branches from to_delete values
-    let mut deletable_branches : HashSet<String> = HashSet::new();
+    let mut deletable_branches: HashSet<String> = HashSet::new();
     for branch in to_delete.keys() {
         deletable_branches.insert(branch.clone());
     }
@@ -163,7 +173,7 @@ fn is_working_tree_clean(repo: &Repository) -> bool {
                 return false;
             }
             true
-        },
+        }
         Err(()) => {
             log_error("Failed to get working tree status");
             false

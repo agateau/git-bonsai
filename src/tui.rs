@@ -15,8 +15,7 @@ pub fn log_info(msg: &str) {
 }
 
 pub fn select(msg: &str, items: &Vec<String>) -> Vec<usize> {
-    let checked_items : Vec<(String, bool)> = items.iter()
-        .map(|x| (x.clone(), true)).collect();
+    let checked_items: Vec<(String, bool)> = items.iter().map(|x| (x.clone(), true)).collect();
 
     Checkboxes::with_theme(&ColorfulTheme::default())
         .with_prompt(msg)
