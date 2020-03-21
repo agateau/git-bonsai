@@ -193,6 +193,8 @@ mod tests {
         let repo = Repository::new(path_str);
 
         repo.git("init", &[]).expect("init failed");
+        repo.git("config", &["user.name", "test"]).expect("config test failed");
+        repo.git("config", &["user.email", "test@example.com"]).expect("config email failed");
         repo.git("add", &["."]).expect("add failed");
         repo.git("commit", &["-m", "init"]).expect("commit failed");
 
