@@ -1,10 +1,16 @@
 [package]
 name = "git-bonsai"
 version = "0.1.0"
-authors = ["Aurelien Gateau <mail@agateau.com>"]
+authors = ["Aurélien Gâteau <mail@agateau.com>"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "Command-line tool to clean the branches of your git garden"
+documentation = "https://github.com/agateau/git-bonsai"
+readme = "README.md"
+homepage = "https://github.com/agateau/git-bonsai"
+repository = "https://github.com/agateau/git-bonsai"
+license = "GPL-3.0+"
+keywords = ["git", "clean"]
+categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
 structopt = "0.2.10"
