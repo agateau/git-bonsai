@@ -32,7 +32,7 @@ impl BranchRestorer<'_> {
         let current_branch = repo.get_current_branch().expect("Can't get current branch");
         BranchRestorer {
             repository: &repo,
-            branch: current_branch.to_string(),
+            branch: current_branch,
         }
     }
 }
@@ -123,7 +123,7 @@ impl Repository {
         };
         for line in lines {
             if line.contains("[origin/") && !line.contains(": gone]") {
-                let branch = line.split(" ").next();
+                let branch = line.split(' ').next();
                 branches.push(branch.unwrap().to_string());
             }
         }

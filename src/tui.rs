@@ -32,7 +32,7 @@ pub fn log_info(msg: &str) {
     println!("{}", style(format!("Info: {}", msg)).blue());
 }
 
-pub fn select(msg: &str, items: &Vec<String>) -> Vec<usize> {
+pub fn select(msg: &str, items: &[String]) -> Vec<usize> {
     let checked_items: Vec<(String, bool)> = items.iter().map(|x| (x.clone(), true)).collect();
 
     Checkboxes::with_theme(&ColorfulTheme::default())

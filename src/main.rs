@@ -46,7 +46,7 @@ fn get_protected_branches(config: &Config) -> HashSet<String> {
 fn get_deletable_branches(
     config: &Config,
     repo: &Repository,
-    branches: &Vec<String>,
+    branches: &[String],
 ) -> Result<HashMap<String, HashSet<String>>, i32> {
     let protected_branches = get_protected_branches(&config);
 
@@ -66,7 +66,7 @@ fn get_deletable_branches(
             if branch == &merged_branch {
                 continue;
             }
-            let entry = to_delete.entry(merged_branch).or_insert(HashSet::new());
+            let entry = to_delete.entry(merged_branch).or_insert_with(HashSet::new);
             (*entry).insert(branch.clone());
         }
     }
