@@ -6,8 +6,6 @@ on:
     - master
     - dev
   pull_request:
-    branches:
-    - '**'
 
 jobs:
   build:
@@ -15,6 +13,16 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Build
-      run: cargo build --verbose
+      run: ci/build-app
     - name: Run tests
-      run: cargo test --verbose
+      run: ci/run-tests
+    - name: Create archive
+      run: ci/create-archive
+    - name: Set archive name
+      shell: bash
+      run: |
+        echo "::set-env name=ARCHIVE_NAME::$(cat artifacts/archive-name)"
+    - uses: actions/upload-artifact@v1
+      with:
+        name: ${{ env.ARCHIVE_NAME }}
+        path: "artifacts/${{ env.ARCHIVE_NAME }}"

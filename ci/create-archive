@@ -1,0 +1,28 @@
+#!/bin/bash
+set -euo pipefail
+
+cd $(dirname $0)/..
+
+APP_NAME=git-bonsai
+DATA_FILES="README.md CHANGELOG.md LICENSE"
+VERSION=$(git describe --always)
+ARTIFACTS_DIR=$PWD/artifacts
+ARCHIVE_DIR=$APP_NAME-$VERSION
+ARCHIVE_NAME=$APP_NAME-$VERSION.tar.bz2
+ARCHIVE_NAME_FILE=$ARTIFACTS_DIR/archive-name
+
+rm -rf $ARTIFACTS_DIR
+mkdir -p $ARTIFACTS_DIR/$ARCHIVE_DIR
+
+echo "Copying and stripping binary"
+cp target/release/$APP_NAME $ARTIFACTS_DIR/$ARCHIVE_DIR
+strip $ARTIFACTS_DIR/$ARCHIVE_DIR/$APP_NAME
+
+echo "Copying data file"
+cp $DATA_FILES $ARTIFACTS_DIR/$ARCHIVE_DIR
+
+echo "Creating archive $ARTIFACTS_DIR/$ARCHIVE_NAME"
+( cd $ARTIFACTS_DIR && tar -cjf $ARCHIVE_NAME $ARCHIVE_DIR )
+
+echo "Storing archive name in $ARCHIVE_NAME_FILE"
+echo $ARCHIVE_NAME > $ARCHIVE_NAME_FILE

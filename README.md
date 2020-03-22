@@ -47,9 +47,17 @@ switches to `master` and run `git branch -d b1`.
 
 ## Installation
 
-Git Bonsai is written in [Rust][]. To install it, install Rust and then run:
+The easiest way to install is to download an archive from the [release
+page][release], unpack it and copy the `git-bonsai` binary in a directory in
+$PATH.
 
-    cargo install --path .
+[release]: https://github.com/agateau/git-bonsai/releases
+
+## Building it
+
+Git Bonsai is written in [Rust][]. To build it, install Rust and then run:
+
+    cargo install git-bonsai
 
 [Rust]: https://www.rust-lang.org
 
