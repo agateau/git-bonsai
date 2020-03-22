@@ -5,7 +5,14 @@ cd $(dirname $0)/..
 
 APP_NAME=git-bonsai
 DATA_FILES="README.md CHANGELOG.md LICENSE"
-VERSION=$(git describe --always)
+
+set +u
+# Let caller define VERSION through an environment variable
+if [ -z "$VERSION" ] ; then
+    VERSION=$(git describe --always)
+fi
+set -u
+
 ARTIFACTS_DIR=$PWD/artifacts
 ARCHIVE_DIR=$APP_NAME-$VERSION
 ARCHIVE_NAME=$APP_NAME-$VERSION.tar.bz2

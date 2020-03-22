@@ -18,7 +18,19 @@ jobs:
     - name: Run tests
       run: ci/run-tests
     - name: Create archive
-      run: ci/create-archive
+      shell: bash
+      run: |
+        # `git describe --always` returns a sha1 when called here, even when building a tag.
+        # Use https://github.community/t5/GitHub-Actions/How-to-get-just-the-tag-name/m-p/32167/highlight/true#M1027
+        # as a workaround when building a tag
+        case "$GITHUB_REF" in
+        refs/tags/*)
+            export VERSION=${GITHUB_REF/refs\/tags\//}
+            ;;
+        *)
+            ;;
+        esac
+        ci/create-archive
     - name: Set archive name
       shell: bash
       run: |
