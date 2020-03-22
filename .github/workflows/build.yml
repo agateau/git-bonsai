@@ -5,7 +5,7 @@ on:
     branches:
     - master
     - dev
-    tags: "^[0-9]"
+    tags: "[0-9]*"
   pull_request:
 
 jobs:
