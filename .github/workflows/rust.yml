@@ -16,3 +16,13 @@ jobs:
       run: ci/build-app
     - name: Run tests
       run: ci/run-tests
+    - name: Create archive
+      run: ci/create-archive
+    - name: Set archive name
+      shell: bash
+      run: |
+        echo "::set-env name=ARCHIVE_NAME::$(cat artifacts/archive-name)"
+    - uses: actions/upload-artifact@v1
+      with:
+        name: ${{ env.ARCHIVE_NAME }}
+        path: "artifacts/${{ env.ARCHIVE_NAME }}"
