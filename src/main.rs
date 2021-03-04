@@ -31,6 +31,10 @@ struct Config {
     /// Branches to protect from suppression (in addition to master)
     #[structopt(short = "x", long)]
     excluded: Vec<String>,
+
+    /// Do not fetch changes
+    #[structopt(long = "no-fetch")]
+    no_fetch: bool,
 }
 
 fn get_protected_branches(config: &Config) -> HashSet<String> {
@@ -208,8 +212,10 @@ fn runapp() -> i32 {
         return 1;
     }
 
-    if let Err(x) = fetch_changes(&repo) {
-        return x;
+    if !config.no_fetch {
+        if let Err(x) = fetch_changes(&repo) {
+            return x;
+        }
     }
 
     if let Err(x) = update_tracking_branches(&repo) {
