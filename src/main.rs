@@ -46,16 +46,23 @@ fn get_protected_branches(config: &Config) -> HashSet<String> {
     protected_branches
 }
 
-/// Returns a map of branch_to_delete => (branches containing it)
+/// Given a repository, returns a map of branch_to_delete => (branches containing it)
 fn get_deletable_branches(
     config: &Config,
-    repo: &Repository,
-    branches: &[String],
+    repo: &Repository
 ) -> Result<HashMap<String, HashSet<String>>, i32> {
+    let branches = match repo.list_branches() {
+        Ok(x) => x,
+        Err(x) => {
+            log_error("Failed to list branches");
+            return Err(x);
+        }
+    };
+
     let protected_branches = get_protected_branches(&config);
 
     let mut to_delete: HashMap<String, HashSet<String>> = HashMap::new();
-    for branch in branches {
+    for branch in &branches {
         let merged_branches = match repo.list_merged_branches(&branch) {
             Ok(x) => x,
             Err(x) => {
@@ -63,14 +70,14 @@ fn get_deletable_branches(
                 return Err(x);
             }
         };
-        for merged_branch in merged_branches {
-            if protected_branches.contains(&merged_branch) {
+        for merged_branch in &merged_branches {
+            if protected_branches.contains(merged_branch) {
                 continue;
             }
-            if branch == &merged_branch {
+            if branch == merged_branch {
                 continue;
             }
-            let entry = to_delete.entry(merged_branch).or_insert_with(HashSet::new);
+            let entry = to_delete.entry(merged_branch.to_string()).or_insert_with(HashSet::new);
             (*entry).insert(branch.clone());
         }
     }
@@ -102,14 +109,7 @@ fn select_branches_to_delete(to_delete: &HashMap<String, HashSet<String>>) -> Ve
 }
 
 fn remove_merged_branches(config: &Config, repo: &Repository) -> Result<(), i32> {
-    let branches = match repo.list_branches() {
-        Ok(x) => x,
-        Err(x) => {
-            log_error("Failed to list branches");
-            return Err(x);
-        }
-    };
-    let mut to_delete = match get_deletable_branches(&config, &repo, &branches) {
+    let mut to_delete = match get_deletable_branches(&config, &repo) {
         Ok(x) => x,
         Err(x) => {
             return Err(x);
