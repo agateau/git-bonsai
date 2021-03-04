@@ -1,0 +1,40 @@
+#!/bin/bash
+set -euo pipefail
+
+create_branch() {
+    local base=$1
+    local branch=$2
+    git checkout -b $branch $base
+    touch $branch
+    git add $branch
+    git commit $branch -m "Create $branch"
+}
+
+merge() {
+    local branch=$1
+    git merge --no-ff "$branch" -m "Merging $branch"
+}
+
+rm -rf demo
+mkdir demo
+cd demo
+
+git init
+touch README
+git add README
+git commit -m "Init" README
+
+create_branch master topic1
+create_branch topic1 topic1-1
+create_branch master topic2
+
+git checkout topic1
+merge topic1-1
+
+git checkout master
+merge topic1
+
+# Create two branches pointing to the same commit
+create_branch master duplicate1
+git branch duplicate2
+git checkout master
