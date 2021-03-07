@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Aurélien Gâteau <mail@agateau.com>
+ * Copyright 2021 Aurélien Gâteau <mail@agateau.com>
  *
  * This file is part of git-bonsai.
  *
@@ -18,39 +18,18 @@
  */
 use structopt::StructOpt;
 
-mod app;
-mod cliargs;
-mod git;
-mod tui;
+/// Keep a git repository clean and tidy.
+#[derive(StructOpt)]
+pub struct CliArgs {
+    /// Branches to protect from suppression (in addition to master)
+    #[structopt(short = "x", long)]
+    pub excluded: Vec<String>,
 
-use app::App;
-use cliargs::CliArgs;
+    /// Do not fetch changes
+    #[structopt(long = "no-fetch")]
+    pub no_fetch: bool,
 
-fn runapp() -> i32 {
-    let args = CliArgs::from_args();
-
-    let app = App::new(&args, ".");
-
-    if !app.is_working_tree_clean() {
-        return 1;
-    }
-
-    if !args.no_fetch {
-        if let Err(x) = app.fetch_changes() {
-            return x;
-        }
-    }
-
-    if let Err(x) = app.update_tracking_branches() {
-        return x;
-    }
-
-    if let Err(x) = app.remove_merged_branches() {
-        return x;
-    }
-    0
-}
-
-fn main() {
-    ::std::process::exit(runapp());
+    /// Do not ask for confirmation
+    #[structopt(short = "y", long = "yes")]
+    pub yes: bool,
 }
