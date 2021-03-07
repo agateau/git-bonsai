@@ -24,9 +24,9 @@ mod tests {
 
     use std::fs::File;
 
+    use assert_cmd::Command;
     use git_bonsai::git::create_test_repository;
     use git_bonsai::git::Repository;
-    use assert_cmd::Command;
 
     fn create_repository() -> (assert_fs::TempDir, Repository) {
         let dir = assert_fs::TempDir::new().unwrap();
@@ -43,7 +43,8 @@ mod tests {
     }
 
     fn merge_branch(repo: &Repository, name: &str) {
-        repo.git("merge", &["--no-ff", name, "-m", "Merging branch"]).unwrap();
+        repo.git("merge", &["--no-ff", name, "-m", "Merging branch"])
+            .unwrap();
     }
 
     #[test]

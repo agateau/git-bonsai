@@ -53,7 +53,7 @@ fn get_protected_branches(config: &Config) -> HashSet<String> {
 /// Given a repository, returns a map of branch_to_delete => (branches containing it)
 fn get_deletable_branches(
     config: &Config,
-    repo: &Repository
+    repo: &Repository,
 ) -> Result<HashMap<String, HashSet<String>>, i32> {
     let branches = match repo.list_branches() {
         Ok(x) => x,
@@ -81,7 +81,9 @@ fn get_deletable_branches(
             if branch == merged_branch {
                 continue;
             }
-            let entry = to_delete.entry(merged_branch.to_string()).or_insert_with(HashSet::new);
+            let entry = to_delete
+                .entry(merged_branch.to_string())
+                .or_insert_with(HashSet::new);
             (*entry).insert(branch.clone());
         }
     }
@@ -138,7 +140,7 @@ fn remove_merged_branches(config: &Config, repo: &Repository) -> Result<(), i32>
 
     let selected_branches = match config.yes {
         false => select_branches_to_delete(&to_delete),
-        true => to_delete.keys().map(|x| x.clone()).collect::<Vec<String>>()
+        true => to_delete.keys().map(|x| x.clone()).collect::<Vec<String>>(),
     };
     if selected_branches.is_empty() {
         return Ok(());

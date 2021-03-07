@@ -16,8 +16,8 @@
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-use std::process::Command;
 use std::fs::File;
+use std::process::Command;
 
 /**
  * Restores the current git branch when dropped
@@ -189,8 +189,10 @@ pub fn create_test_repository(repo_dir: &str) -> Repository {
     let repo = Repository::new(repo_dir);
 
     repo.git("init", &[]).expect("init failed");
-    repo.git("config", &["user.name", "test"]).expect("setting username failed");
-    repo.git("config", &["user.email", "test@example.com"]).expect("setting email failed");
+    repo.git("config", &["user.name", "test"])
+        .expect("setting username failed");
+    repo.git("config", &["user.email", "test@example.com"])
+        .expect("setting email failed");
 
     // Create a file so that we have more than the start commit
     File::create(repo_dir.to_owned() + "/f").unwrap();
