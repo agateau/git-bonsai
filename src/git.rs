@@ -17,6 +17,7 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 use std::process::Command;
+use std::fs::File;
 
 /**
  * Restores the current git branch when dropped
@@ -54,6 +55,11 @@ impl Repository {
         Repository {
             dir: dir.to_string(),
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn get_dir(&self) -> &str {
+        &self.dir
     }
 
     pub fn git(&self, subcommand: &str, args: &[&str]) -> Result<String, i32> {
@@ -177,33 +183,35 @@ impl Repository {
     }
 }
 
+// Used by test code
+#[allow(dead_code)]
+pub fn create_test_repository(repo_dir: &str) -> Repository {
+    let repo = Repository::new(repo_dir);
+
+    repo.git("init", &[]).expect("init failed");
+    repo.git("config", &["user.name", "test"]).expect("setting username failed");
+    repo.git("config", &["user.email", "test@example.com"]).expect("setting email failed");
+
+    // Create a file so that we have more than the start commit
+    File::create(repo_dir.to_owned() + "/f").unwrap();
+    repo.git("add", &["."]).expect("add failed");
+    repo.git("commit", &["-m", "init"]).expect("commit failed");
+
+    repo
+}
+
 #[cfg(test)]
 mod tests {
     extern crate assert_cmd;
     extern crate assert_fs;
 
     use super::*;
-    use assert_fs::prelude::*;
-
-    fn create_test_repository() -> (assert_fs::TempDir, Repository) {
-        let dir = assert_fs::TempDir::new().unwrap();
-        dir.child("f").touch().unwrap();
-
-        let path_str = dir.path().to_str().unwrap();
-        let repo = Repository::new(path_str);
-
-        repo.git("init", &[]).expect("init failed");
-        repo.git("config", &["user.name", "test"]).expect("config test failed");
-        repo.git("config", &["user.email", "test@example.com"]).expect("config email failed");
-        repo.git("add", &["."]).expect("add failed");
-        repo.git("commit", &["-m", "init"]).expect("commit failed");
-
-        (dir, repo)
-    }
 
     #[test]
     fn get_current_branch() {
-        let (_repo_dir, repo) = create_test_repository();
+        let dir = assert_fs::TempDir::new().unwrap();
+        let path_str = dir.path().to_str().unwrap();
+        let repo = create_test_repository(path_str);
         assert_eq!(repo.get_current_branch().unwrap(), "master");
 
         repo.git("checkout", &["-b", "test"])

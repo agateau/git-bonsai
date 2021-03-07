@@ -35,6 +35,10 @@ struct Config {
     /// Do not fetch changes
     #[structopt(long = "no-fetch")]
     no_fetch: bool,
+
+    /// Do not ask for confirmation
+    #[structopt(short = "y", long = "yes")]
+    yes: bool,
 }
 
 fn get_protected_branches(config: &Config) -> HashSet<String> {
@@ -132,7 +136,10 @@ fn remove_merged_branches(config: &Config, repo: &Repository) -> Result<(), i32>
         return Ok(());
     }
 
-    let selected_branches = select_branches_to_delete(&to_delete);
+    let selected_branches = match config.yes {
+        false => select_branches_to_delete(&to_delete),
+        true => to_delete.keys().map(|x| x.clone()).collect::<Vec<String>>()
+    };
     if selected_branches.is_empty() {
         return Ok(());
     }
