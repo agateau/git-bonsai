@@ -34,7 +34,7 @@ jobs:
     - name: Set archive name
       shell: bash
       run: |
-        echo "::set-env name=ARCHIVE_NAME::$(cat artifacts/archive-name)"
+        echo "ARCHIVE_NAME=$(cat artifacts/archive-name)" >> $GITHUB_ENV
     - uses: actions/upload-artifact@v1
       with:
         name: ${{ env.ARCHIVE_NAME }}
