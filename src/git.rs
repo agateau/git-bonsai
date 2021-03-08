@@ -47,7 +47,7 @@ impl Drop for BranchRestorer<'_> {
 }
 
 pub struct Repository {
-    dir: String,
+    pub dir: String,
 }
 
 impl Repository {
@@ -55,11 +55,6 @@ impl Repository {
         Repository {
             dir: dir.to_string(),
         }
-    }
-
-    #[allow(dead_code)]
-    pub fn get_dir(&self) -> &str {
-        &self.dir
     }
 
     pub fn git(&self, subcommand: &str, args: &[&str]) -> Result<String, i32> {

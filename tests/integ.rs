@@ -37,7 +37,7 @@ mod tests {
 
     fn create_branch(repo: &Repository, name: &str) {
         repo.git("checkout", &["-b", name]).unwrap();
-        File::create(repo.get_dir().to_owned() + "/" + name).unwrap();
+        File::create(repo.dir.to_owned() + "/" + name).unwrap();
         repo.git("add", &[name]).unwrap();
         repo.git("commit", &["-m", "Create branch"]).unwrap();
     }
