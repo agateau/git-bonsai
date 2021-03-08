@@ -18,38 +18,60 @@
  */
 use std::collections::{HashMap, HashSet};
 
+use crate::appui::{AppUi, BranchToDeleteInfo};
 use crate::cliargs::CliArgs;
 use crate::git::{BranchRestorer, Repository};
 use crate::tui::{self, log_error, log_info, log_warning};
 
-fn format_select_item(branch: &str, containers: &HashSet<String>) -> String {
-    let container_str = containers
+struct InteractiveAppUi;
+
+fn format_branch_info(branch_info: &BranchToDeleteInfo) -> String {
+    let container_str = branch_info
+        .contained_in
         .iter()
         .map(|x| format!("      - {}", x))
         .collect::<Vec<String>>()
         .join("\n");
 
-    format!("{}, contained in:\n{} \n", branch, container_str)
+    format!("{}, contained in:\n{} \n", branch_info.name, container_str)
 }
 
-fn select_branches_to_delete(to_delete: &HashMap<String, HashSet<String>>) -> Vec<String> {
-    let (branches, select_items): (Vec<String>, Vec<String>) = to_delete
-        .iter()
-        .map(|(key, value)| (key.to_owned(), format_select_item(key, value)))
-        .unzip();
+impl AppUi for InteractiveAppUi {
+    fn log_info(&self, msg: &str) {
+        tui::log_info(msg);
+    }
 
-    let selections = tui::select("Select branches to delete", &select_items);
+    fn log_warning(&self, msg: &str) {
+        tui::log_warning(msg);
+    }
 
-    selections
-        .iter()
-        .map(|&x| branches[x].clone())
-        .collect::<Vec<String>>()
+    fn log_error(&self, msg: &str) {
+        tui::log_error(msg);
+    }
+
+    fn select_branches_to_delete(
+        &self,
+        branch_infos: &[BranchToDeleteInfo],
+    ) -> Vec<BranchToDeleteInfo> {
+        let select_items: Vec<String> = branch_infos
+            .iter()
+            .map(|x| format_branch_info(&x))
+            .collect::<Vec<String>>();
+
+        let selections = tui::select("Select branches to delete", &select_items);
+
+        selections
+            .iter()
+            .map(|&x| branch_infos[x].clone())
+            .collect::<Vec<BranchToDeleteInfo>>()
+    }
 }
 
 pub struct App {
     repo: Repository,
     protected_branches: HashSet<String>,
     ask_confirmation: bool,
+    ui: Box<dyn AppUi>,
 }
 
 impl App {
@@ -63,6 +85,7 @@ impl App {
             repo: Repository::new(repo_dir),
             protected_branches: branches,
             ask_confirmation: !args.yes,
+            ui: Box::new(InteractiveAppUi {}),
         }
     }
 
@@ -116,23 +139,12 @@ impl App {
         Ok(())
     }
     pub fn remove_merged_branches(&self) -> Result<(), i32> {
-        let mut to_delete = match self.get_deletable_branches() {
+        let to_delete = match self.get_deletable_branches() {
             Ok(x) => x,
             Err(x) => {
                 return Err(x);
             }
         };
-
-        // Remove deletable branches from to_delete values
-        let mut deletable_branches: HashSet<String> = HashSet::new();
-        for branch in to_delete.keys() {
-            deletable_branches.insert(branch.clone());
-        }
-        for (_, contained_in) in to_delete.iter_mut() {
-            for deletable_branch in &deletable_branches {
-                contained_in.remove(deletable_branch);
-            }
-        }
 
         if to_delete.is_empty() {
             println!("No deletable branches");
@@ -140,31 +152,30 @@ impl App {
         }
 
         let selected_branches = match self.ask_confirmation {
-            true => select_branches_to_delete(&to_delete),
-            false => to_delete.keys().map(|x| x.clone()).collect::<Vec<String>>()
+            true => self.ui.select_branches_to_delete(&to_delete),
+            false => to_delete,
         };
         if selected_branches.is_empty() {
             return Ok(());
         }
 
         let _restorer = BranchRestorer::new(&self.repo);
-        for branch in &selected_branches {
-            log_info(&format!("Deleting {}", branch));
-            let contained_in = &to_delete[branch];
+        for branch_info in &selected_branches {
+            log_info(&format!("Deleting {}", branch_info.name));
+            let contained_in = &branch_info.contained_in;
             let container = contained_in.iter().next().unwrap();
             if self.repo.checkout(container).is_err() {
                 log_warning("Failed to checkout branch");
                 continue;
             }
-            if self.repo.delete_branch(branch).is_err() {
+            if self.repo.delete_branch(&branch_info.name).is_err() {
                 log_warning("Failed to delete branch");
             }
         }
         Ok(())
     }
 
-    /// Given a repository, returns a map of branch_to_delete => (branches containing it)
-    fn get_deletable_branches(&self) -> Result<HashMap<String, HashSet<String>>, i32> {
+    fn get_deletable_branches(&self) -> Result<Vec<BranchToDeleteInfo>, i32> {
         let branches = match self.repo.list_branches() {
             Ok(x) => x,
             Err(x) => {
@@ -189,10 +200,35 @@ impl App {
                 if branch == merged_branch {
                     continue;
                 }
-                let entry = to_delete.entry(merged_branch.to_string()).or_insert_with(HashSet::new);
+                let entry = to_delete
+                    .entry(merged_branch.to_string())
+                    .or_insert_with(HashSet::new);
                 (*entry).insert(branch.clone());
             }
         }
-        Ok(to_delete)
+
+        // Remove deletable branches from to_delete values
+        let branch_names = to_delete
+            .keys()
+            .map(|x| x.clone())
+            .collect::<HashSet<String>>();
+        for (_, contained_in) in to_delete.iter_mut() {
+            let diff = (*contained_in)
+                .difference(&branch_names)
+                .map(|x| x.clone())
+                .collect::<HashSet<String>>();
+            *contained_in = diff;
+        }
+
+        // Create our final list
+        let deletable_branches = to_delete
+            .iter()
+            .map(|(name, contained_in)| BranchToDeleteInfo {
+                name: name.to_string(),
+                contained_in: contained_in.clone(),
+            })
+            .collect::<Vec<BranchToDeleteInfo>>();
+
+        Ok(deletable_branches)
     }
 }

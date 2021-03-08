@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Aurélien Gâteau <mail@agateau.com>
+ * Copyright 2021 Aurélien Gâteau <mail@agateau.com>
  *
  * This file is part of git-bonsai.
  *
@@ -16,42 +16,24 @@
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-use structopt::StructOpt;
+/**
+ * This module provides a "high-level" interface for the UI
+ */
+use std::collections::HashSet;
 
-mod app;
-mod appui;
-mod cliargs;
-mod git;
-mod tui;
-
-use app::App;
-use cliargs::CliArgs;
-
-fn runapp() -> i32 {
-    let args = CliArgs::from_args();
-
-    let app = App::new(&args, ".");
-
-    if !app.is_working_tree_clean() {
-        return 1;
-    }
-
-    if !args.no_fetch {
-        if let Err(x) = app.fetch_changes() {
-            return x;
-        }
-    }
-
-    if let Err(x) = app.update_tracking_branches() {
-        return x;
-    }
-
-    if let Err(x) = app.remove_merged_branches() {
-        return x;
-    }
-    0
+#[derive(Clone)]
+pub struct BranchToDeleteInfo {
+    pub name: String,
+    pub contained_in: HashSet<String>,
 }
 
-fn main() {
-    ::std::process::exit(runapp());
+pub trait AppUi {
+    fn log_info(&self, msg: &str);
+    fn log_warning(&self, msg: &str);
+    fn log_error(&self, msg: &str);
+
+    fn select_branches_to_delete(
+        &self,
+        branch_infos: &[BranchToDeleteInfo],
+    ) -> Vec<BranchToDeleteInfo>;
 }
