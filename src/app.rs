@@ -21,51 +21,8 @@ use std::collections::{HashMap, HashSet};
 use crate::appui::{AppUi, BranchToDeleteInfo};
 use crate::cliargs::CliArgs;
 use crate::git::{BranchRestorer, Repository};
-use crate::tui::{self, log_error, log_info, log_warning};
+use crate::interactiveappui::InteractiveAppUi;
 
-struct InteractiveAppUi;
-
-fn format_branch_info(branch_info: &BranchToDeleteInfo) -> String {
-    let container_str = branch_info
-        .contained_in
-        .iter()
-        .map(|x| format!("      - {}", x))
-        .collect::<Vec<String>>()
-        .join("\n");
-
-    format!("{}, contained in:\n{} \n", branch_info.name, container_str)
-}
-
-impl AppUi for InteractiveAppUi {
-    fn log_info(&self, msg: &str) {
-        tui::log_info(msg);
-    }
-
-    fn log_warning(&self, msg: &str) {
-        tui::log_warning(msg);
-    }
-
-    fn log_error(&self, msg: &str) {
-        tui::log_error(msg);
-    }
-
-    fn select_branches_to_delete(
-        &self,
-        branch_infos: &[BranchToDeleteInfo],
-    ) -> Vec<BranchToDeleteInfo> {
-        let select_items: Vec<String> = branch_infos
-            .iter()
-            .map(|x| format_branch_info(&x))
-            .collect::<Vec<String>>();
-
-        let selections = tui::select("Select branches to delete", &select_items);
-
-        selections
-            .iter()
-            .map(|&x| branch_infos[x].clone())
-            .collect::<Vec<BranchToDeleteInfo>>()
-    }
-}
 
 pub struct App {
     repo: Repository,
@@ -91,26 +48,26 @@ impl App {
 
     pub fn is_working_tree_clean(&self) -> bool {
         if self.repo.get_current_branch() == None {
-            log_error("No current branch");
+            self.ui.log_error("No current branch");
             return false;
         }
         match self.repo.has_changes() {
             Ok(has_changes) => {
                 if has_changes {
-                    log_error("Can't work in a tree with uncommitted changes");
+                    self.ui.log_error("Can't work in a tree with uncommitted changes");
                     return false;
                 }
                 true
             }
             Err(()) => {
-                log_error("Failed to get working tree status");
+                self.ui.log_error("Failed to get working tree status");
                 false
             }
         }
     }
 
     pub fn fetch_changes(&self) -> Result<(), i32> {
-        log_info("Fetching changes");
+        self.ui.log_info("Fetching changes");
         self.repo.fetch()
     }
 
@@ -118,20 +75,20 @@ impl App {
         let branches = match self.repo.list_tracking_branches() {
             Ok(x) => x,
             Err(x) => {
-                log_error("Failed to list tracking branches");
+                self.ui.log_error("Failed to list tracking branches");
                 return Err(x);
             }
         };
 
         let _restorer = BranchRestorer::new(&self.repo);
         for branch in branches {
-            log_info(&format!("Updating {}", branch));
+            self.ui.log_info(&format!("Updating {}", branch));
             if let Err(x) = self.repo.checkout(&branch) {
-                log_error("Failed to checkout branch");
+                self.ui.log_error("Failed to checkout branch");
                 return Err(x);
             }
             if let Err(_x) = self.repo.update_branch() {
-                log_warning("Failed to update branch");
+                self.ui.log_warning("Failed to update branch");
                 // This is not wrong, it can happen if the branches have diverged
                 // let's continue
             }
@@ -161,15 +118,15 @@ impl App {
 
         let _restorer = BranchRestorer::new(&self.repo);
         for branch_info in &selected_branches {
-            log_info(&format!("Deleting {}", branch_info.name));
+            self.ui.log_info(&format!("Deleting {}", branch_info.name));
             let contained_in = &branch_info.contained_in;
             let container = contained_in.iter().next().unwrap();
             if self.repo.checkout(container).is_err() {
-                log_warning("Failed to checkout branch");
+                self.ui.log_warning("Failed to checkout branch");
                 continue;
             }
             if self.repo.delete_branch(&branch_info.name).is_err() {
-                log_warning("Failed to delete branch");
+                self.ui.log_warning("Failed to delete branch");
             }
         }
         Ok(())
@@ -179,7 +136,7 @@ impl App {
         let branches = match self.repo.list_branches() {
             Ok(x) => x,
             Err(x) => {
-                log_error("Failed to list branches");
+                self.ui.log_error("Failed to list branches");
                 return Err(x);
             }
         };
@@ -189,7 +146,7 @@ impl App {
             let merged_branches = match self.repo.list_merged_branches(&branch) {
                 Ok(x) => x,
                 Err(x) => {
-                    log_error("Failed to list merged branches");
+                    self.ui.log_error("Failed to list merged branches");
                     return Err(x);
                 }
             };

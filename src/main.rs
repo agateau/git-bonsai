@@ -22,6 +22,7 @@ mod app;
 mod appui;
 mod cliargs;
 mod git;
+mod interactiveappui;
 mod tui;
 
 use app::App;
