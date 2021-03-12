@@ -20,18 +20,26 @@ use structopt::StructOpt;
 
 mod app;
 mod appui;
+mod batchappui;
 mod cliargs;
 mod git;
 mod interactiveappui;
 mod tui;
 
 use app::App;
+use appui::AppUi;
+use batchappui::BatchAppUi;
 use cliargs::CliArgs;
+use interactiveappui::InteractiveAppUi;
 
 fn runapp() -> i32 {
     let args = CliArgs::from_args();
 
-    let app = App::new(&args, ".");
+    let ui: Box<dyn AppUi> = match args.yes {
+        false => Box::new(InteractiveAppUi {}),
+        true => Box::new(BatchAppUi {}),
+    };
+    let app = App::new(&args, &*ui, ".");
 
     if !app.is_working_tree_clean() {
         return 1;

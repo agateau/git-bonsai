@@ -21,18 +21,15 @@ use std::collections::{HashMap, HashSet};
 use crate::appui::{AppUi, BranchToDeleteInfo};
 use crate::cliargs::CliArgs;
 use crate::git::{BranchRestorer, Repository};
-use crate::interactiveappui::InteractiveAppUi;
 
-
-pub struct App {
+pub struct App<'a> {
     repo: Repository,
     protected_branches: HashSet<String>,
-    ask_confirmation: bool,
-    ui: Box<dyn AppUi>,
+    ui: &'a dyn AppUi,
 }
 
-impl App {
-    pub fn new(args: &CliArgs, repo_dir: &str) -> App {
+impl<'a> App<'_> {
+    pub fn new(args: &CliArgs, ui: &'a dyn AppUi, repo_dir: &str) -> App<'a> {
         let mut branches: HashSet<String> = HashSet::new();
         branches.insert("master".to_string());
         for branch in &args.excluded {
@@ -41,8 +38,7 @@ impl App {
         App {
             repo: Repository::new(repo_dir),
             protected_branches: branches,
-            ask_confirmation: !args.yes,
-            ui: Box::new(InteractiveAppUi {}),
+            ui: ui,
         }
     }
 
@@ -54,7 +50,8 @@ impl App {
         match self.repo.has_changes() {
             Ok(has_changes) => {
                 if has_changes {
-                    self.ui.log_error("Can't work in a tree with uncommitted changes");
+                    self.ui
+                        .log_error("Can't work in a tree with uncommitted changes");
                     return false;
                 }
                 true
@@ -108,10 +105,7 @@ impl App {
             return Ok(());
         }
 
-        let selected_branches = match self.ask_confirmation {
-            true => self.ui.select_branches_to_delete(&to_delete),
-            false => to_delete,
-        };
+        let selected_branches = self.ui.select_branches_to_delete(&to_delete);
         if selected_branches.is_empty() {
             return Ok(());
         }
