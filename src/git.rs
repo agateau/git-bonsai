@@ -199,7 +199,6 @@ pub fn create_test_repository(repo_dir: &str) -> Repository {
 
 #[cfg(test)]
 mod tests {
-    extern crate assert_cmd;
     extern crate assert_fs;
 
     use super::*;

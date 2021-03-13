@@ -17,16 +17,17 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #[cfg(test)]
-mod tests {
-    extern crate assert_cmd;
+mod integ {
     extern crate assert_fs;
     extern crate git_bonsai;
 
     use std::fs::File;
+    use structopt::StructOpt;
 
-    use assert_cmd::Command;
+    use git_bonsai::cliargs::CliArgs;
     use git_bonsai::git::create_test_repository;
     use git_bonsai::git::Repository;
+    use git_bonsai::libmain::libmain;
 
     fn create_repository() -> (assert_fs::TempDir, Repository) {
         let dir = assert_fs::TempDir::new().unwrap();
@@ -47,37 +48,50 @@ mod tests {
             .unwrap();
     }
 
+    fn run_git_bonsai(cwd: &str, argv: &[&str]) -> i32 {
+        let mut full_argv = vec!["git-bonsai"];
+        full_argv.extend(argv);
+        let args = CliArgs::from_iter(full_argv);
+        libmain(args, &cwd)
+    }
+
     #[test]
     fn no_op() {
+        // GIVEN a repository with a single branch
         let (dir, _repo) = create_repository();
         let path_str = dir.path().to_str().unwrap();
 
-        let mut cmd = Command::cargo_bin("git-bonsai").unwrap();
-        cmd.current_dir(&path_str);
-        cmd.assert().success();
+        // WHEN git-bonsai runs
+        let result = run_git_bonsai(&path_str, &["-y"]);
+
+        // THEN it succeeds
+        assert_eq!(result, 0);
     }
 
     #[test]
     fn delete_merged_branch() {
+        // GIVEN a repository with two topic branches, topic1 and topic2
         let (dir, repo) = create_repository();
         let path_str = dir.path().to_str().unwrap();
         create_branch(&repo, "topic1");
+        create_branch(&repo, "topic2");
+        // AND topic1 has been merged in master
         repo.checkout("master").unwrap();
         merge_branch(&repo, "topic1");
 
         {
             let branches = repo.list_branches().unwrap();
-            assert_eq!(branches, ["master", "topic1"].to_vec());
+            assert_eq!(branches, ["master", "topic1", "topic2"].to_vec());
         }
 
-        let mut cmd = Command::cargo_bin("git-bonsai").unwrap();
-        cmd.arg("-y");
-        cmd.current_dir(&path_str);
-        cmd.assert().success();
+        // WHEN git-bonsai runs
+        let result = run_git_bonsai(&path_str, &["-y"]);
+        assert_eq!(result, 0);
 
+        // THEN only the topic1 branch has been removed
         {
             let branches = repo.list_branches().unwrap();
-            assert_eq!(branches, ["master"].to_vec());
+            assert_eq!(branches, ["master", "topic2"].to_vec());
         }
     }
 }

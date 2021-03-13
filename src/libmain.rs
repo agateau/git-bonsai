@@ -16,11 +16,35 @@
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-pub mod app;
-pub mod appui;
-pub mod batchappui;
-pub mod cliargs;
-pub mod git;
-pub mod interactiveappui;
-pub mod libmain;
-pub mod tui;
+use crate::app::App;
+use crate::appui::AppUi;
+use crate::batchappui::BatchAppUi;
+use crate::cliargs::CliArgs;
+use crate::interactiveappui::InteractiveAppUi;
+
+pub fn libmain(args: CliArgs, dir: &str) -> i32 {
+    let ui: Box<dyn AppUi> = match args.yes {
+        false => Box::new(InteractiveAppUi {}),
+        true => Box::new(BatchAppUi {}),
+    };
+    let app = App::new(&args, &*ui, &dir);
+
+    if !app.is_working_tree_clean() {
+        return 1;
+    }
+
+    if !args.no_fetch {
+        if let Err(x) = app.fetch_changes() {
+            return x;
+        }
+    }
+
+    if let Err(x) = app.update_tracking_branches() {
+        return x;
+    }
+
+    if let Err(x) = app.remove_merged_branches() {
+        return x;
+    }
+    0
+}

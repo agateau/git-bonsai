@@ -25,42 +25,12 @@ mod cliargs;
 mod git;
 mod interactiveappui;
 mod tui;
+mod libmain;
 
-use app::App;
-use appui::AppUi;
-use batchappui::BatchAppUi;
 use cliargs::CliArgs;
-use interactiveappui::InteractiveAppUi;
-
-fn runapp() -> i32 {
-    let args = CliArgs::from_args();
-
-    let ui: Box<dyn AppUi> = match args.yes {
-        false => Box::new(InteractiveAppUi {}),
-        true => Box::new(BatchAppUi {}),
-    };
-    let app = App::new(&args, &*ui, ".");
-
-    if !app.is_working_tree_clean() {
-        return 1;
-    }
-
-    if !args.no_fetch {
-        if let Err(x) = app.fetch_changes() {
-            return x;
-        }
-    }
-
-    if let Err(x) = app.update_tracking_branches() {
-        return x;
-    }
-
-    if let Err(x) = app.remove_merged_branches() {
-        return x;
-    }
-    0
-}
+use libmain::libmain;
 
 fn main() {
-    ::std::process::exit(runapp());
+    let args = CliArgs::from_args();
+    ::std::process::exit(libmain(args, "."));
 }

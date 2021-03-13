@@ -13,10 +13,9 @@ keywords = ["git", "clean"]
 categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
-structopt = "0.2.10"
+structopt = "0.3.21"
 dialoguer = "0.5.0"
 console = "0.9.2"
 
 [dev-dependencies]
-assert_cmd = "1.0.3"
 assert_fs = "0.13.1"
