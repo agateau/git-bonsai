@@ -94,4 +94,29 @@ mod integ {
             assert_eq!(branches, ["master", "topic2"].to_vec());
         }
     }
+
+    #[test]
+    fn skip_protected_branch() {
+        // GIVEN a repository with a protected, merged branch: "protected"
+        let (dir, repo) = create_repository();
+        let path_str = dir.path().to_str().unwrap();
+        create_branch(&repo, "protected");
+        repo.checkout("master").unwrap();
+        merge_branch(&repo, "protected");
+
+        {
+            let branches = repo.list_branches().unwrap();
+            assert_eq!(branches, ["master", "protected"].to_vec());
+        }
+
+        // WHEN git-bonsai runs
+        let result = run_git_bonsai(&path_str, &["-y", "-x", "protected"]);
+        assert_eq!(result, 0);
+
+        // THEN the protected branch is still there
+        {
+            let branches = repo.list_branches().unwrap();
+            assert_eq!(branches, ["master", "protected"].to_vec());
+        }
+    }
 }
