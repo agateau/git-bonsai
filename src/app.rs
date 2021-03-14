@@ -19,8 +19,10 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::appui::{AppUi, BranchToDeleteInfo};
+use crate::batchappui::BatchAppUi;
 use crate::cliargs::CliArgs;
 use crate::git::{BranchRestorer, Repository};
+use crate::interactiveappui::InteractiveAppUi;
 
 pub struct App<'a> {
     repo: Repository,
@@ -182,4 +184,31 @@ impl<'a> App<'_> {
 
         Ok(deletable_branches)
     }
+}
+
+pub fn run(args: CliArgs, dir: &str) -> i32 {
+    let ui: Box<dyn AppUi> = match args.yes {
+        false => Box::new(InteractiveAppUi {}),
+        true => Box::new(BatchAppUi {}),
+    };
+    let app = App::new(&args, &*ui, &dir);
+
+    if !app.is_working_tree_clean() {
+        return 1;
+    }
+
+    if !args.no_fetch {
+        if let Err(x) = app.fetch_changes() {
+            return x;
+        }
+    }
+
+    if let Err(x) = app.update_tracking_branches() {
+        return x;
+    }
+
+    if let Err(x) = app.remove_merged_branches() {
+        return x;
+    }
+    0
 }

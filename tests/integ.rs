@@ -24,10 +24,10 @@ mod integ {
     use std::fs::File;
     use structopt::StructOpt;
 
+    use git_bonsai::app;
     use git_bonsai::cliargs::CliArgs;
     use git_bonsai::git::create_test_repository;
     use git_bonsai::git::Repository;
-    use git_bonsai::libmain::libmain;
 
     fn create_repository() -> (assert_fs::TempDir, Repository) {
         let dir = assert_fs::TempDir::new().unwrap();
@@ -52,7 +52,7 @@ mod integ {
         let mut full_argv = vec!["git-bonsai"];
         full_argv.extend(argv);
         let args = CliArgs::from_iter(full_argv);
-        libmain(args, &cwd)
+        app::run(args, &cwd)
     }
 
     #[test]
@@ -109,7 +109,7 @@ mod integ {
             assert_eq!(branches, ["master", "protected"].to_vec());
         }
 
-        // WHEN git-bonsai runs
+        // WHEN git-bonsai runs with "-x protected"
         let result = run_git_bonsai(&path_str, &["-y", "-x", "protected"]);
         assert_eq!(result, 0);
 
@@ -117,6 +117,16 @@ mod integ {
         {
             let branches = repo.list_branches().unwrap();
             assert_eq!(branches, ["master", "protected"].to_vec());
+        }
+
+        // WHEN git-bonsai runs without "-x protected"
+        let result = run_git_bonsai(&path_str, &["-y"]);
+        assert_eq!(result, 0);
+
+        // THEN the protected branch is gone
+        {
+            let branches = repo.list_branches().unwrap();
+            assert_eq!(branches, ["master"].to_vec());
         }
     }
 }

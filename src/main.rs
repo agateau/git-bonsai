@@ -25,12 +25,10 @@ mod cliargs;
 mod git;
 mod interactiveappui;
 mod tui;
-mod libmain;
 
 use cliargs::CliArgs;
-use libmain::libmain;
 
 fn main() {
     let args = CliArgs::from_args();
-    ::std::process::exit(libmain(args, "."));
+    ::std::process::exit(app::run(args, "."));
 }

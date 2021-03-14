@@ -22,5 +22,4 @@ pub mod batchappui;
 pub mod cliargs;
 pub mod git;
 pub mod interactiveappui;
-pub mod libmain;
 pub mod tui;
