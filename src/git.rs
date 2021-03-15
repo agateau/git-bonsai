@@ -121,8 +121,8 @@ impl Repository {
         Ok(branches)
     }
 
-    pub fn list_merged_branches(&self, branch: &str) -> Result<Vec<String>, i32> {
-        self.list_branches_internal(&["--merged", branch])
+    pub fn list_branches_containing(&self, commit: &str) -> Result<Vec<String>, i32> {
+        self.list_branches_internal(&["--contains", commit])
     }
 
     pub fn list_tracking_branches(&self) -> Result<Vec<String>, i32> {

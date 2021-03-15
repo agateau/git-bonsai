@@ -21,7 +21,7 @@
  */
 use std::collections::HashSet;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BranchToDeleteInfo {
     pub name: String,
     pub contained_in: HashSet<String>,

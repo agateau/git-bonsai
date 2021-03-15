@@ -139,38 +139,21 @@ impl<'a> App<'_> {
 
         let mut to_delete: HashMap<String, HashSet<String>> = HashMap::new();
         for branch in &branches {
-            let merged_branches = match self.repo.list_merged_branches(&branch) {
+            if self.protected_branches.contains(branch) {
+                continue;
+            }
+            let contained_in = match self.repo.list_branches_containing(&branch) {
                 Ok(x) => x,
                 Err(x) => {
-                    self.ui.log_error("Failed to list merged branches");
+                    self.ui.log_error(&format!("Failed to list branches containing {}", branch));
                     return Err(x);
                 }
-            };
-            for merged_branch in &merged_branches {
-                if self.protected_branches.contains(merged_branch) {
-                    continue;
-                }
-                if branch == merged_branch {
-                    continue;
-                }
-                let entry = to_delete
-                    .entry(merged_branch.to_string())
-                    .or_insert_with(HashSet::new);
-                (*entry).insert(branch.clone());
-            }
-        }
+            }.iter().filter(|x| x != &branch).map(|x| x.clone()).collect::<HashSet<String>>();
 
-        // Remove deletable branches from to_delete values
-        let branch_names = to_delete
-            .keys()
-            .map(|x| x.clone())
-            .collect::<HashSet<String>>();
-        for (_, contained_in) in to_delete.iter_mut() {
-            let diff = (*contained_in)
-                .difference(&branch_names)
-                .map(|x| x.clone())
-                .collect::<HashSet<String>>();
-            *contained_in = diff;
+            if contained_in.is_empty() {
+                continue;
+            }
+            to_delete.insert(branch.to_string(), contained_in);
         }
 
         // Create our final list
