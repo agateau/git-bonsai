@@ -57,6 +57,15 @@ impl Repository {
         }
     }
 
+    #[allow(dead_code)]
+    pub fn clone(dir: &str, url: &str) -> Result<Repository, i32> {
+        let repo = Repository::new(dir);
+        match repo.git("clone", &[url, dir]) {
+            Ok(_x) => Ok(repo),
+            Err(x) => Err(x)
+        }
+    }
+
     pub fn git(&self, subcommand: &str, args: &[&str]) -> Result<String, i32> {
         let mut cmd = Command::new("git");
         cmd.current_dir(&self.dir);

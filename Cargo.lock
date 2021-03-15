@@ -20,9 +20,9 @@ dependencies = [
 
 [[package]]
 name = "assert_fs"
-version = "0.13.1"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "815b47a19f74a89ba726736cdac88c9fba28a655b16ea01225adae328b26f1bf"
+checksum = "3203d5bb9979ac7210f01a150578ebafef6f08b55e79f6db32673c0977b94340"
 dependencies = [
  "doc-comment",
  "globwalk",
@@ -174,9 +174,9 @@ checksum = "a357d28ed41a50f9c765dbfe56cbc04a64e53e5fc58ba79fbc34c10ef3df831f"
 
 [[package]]
 name = "float-cmp"
-version = "0.6.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da62c4f1b81918835a8c6a484a397775fff5953fe83529afd51b05f5c6a6617d"
+checksum = "e1267f4ac4f343772758f7b1bdcbe767c218bbab93bb432acbf5162bbf85a6c4"
 dependencies = [
  "num-traits",
 ]
@@ -205,6 +205,7 @@ dependencies = [
  "assert_fs",
  "console",
  "dialoguer",
+ "predicates",
  "structopt",
 ]
 
@@ -223,10 +224,11 @@ dependencies = [
 
 [[package]]
 name = "globwalk"
-version = "0.7.1"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53cbcf0368596897b0a3b8ff2110acf2400e80ffad4ca9238b52ff282a9b267b"
+checksum = "93e3af942408868f6934a7b85134a3230832b9977cf66125df2f9edcfce4ddcc"
 dependencies = [
+ "bitflags",
  "ignore",
  "walkdir",
 ]
@@ -302,9 +304,9 @@ checksum = "3728d817d99e5ac407411fa471ff9800a778d88a24685968b36824eaf4bee400"
 
 [[package]]
 name = "normalize-line-endings"
-version = "0.2.2"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e0a1a39eab95caf4f5556da9289b9e68f0aafac901b2ce80daaf020d3b733a8"
+checksum = "61807f77802ff30975e01f4f071c8ba10c022052f98b3294119f3e615d13e5be"
 
 [[package]]
 name = "num-traits"
@@ -323,9 +325,9 @@ checksum = "74490b50b9fbe561ac330df47c08f3f33073d2d00c150f719147d7c54522fa1b"
 
 [[package]]
 name = "predicates"
-version = "1.0.3"
+version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1188bf092c81c18228c383b190c069a8a613c18a046ffa9fdfc0f5fc8fb2da8a"
+checksum = "eeb433456c1a57cc93554dea3ce40b4c19c4057e41c55d4a0f3d84ea71c325aa"
 dependencies = [
  "difference",
  "float-cmp",

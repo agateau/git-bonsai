@@ -24,6 +24,9 @@ mod integ {
     use std::fs::File;
     use structopt::StructOpt;
 
+    use assert_fs::prelude::*;
+    use predicates::prelude::*;
+
     use git_bonsai::app;
     use git_bonsai::cliargs::CliArgs;
     use git_bonsai::git::create_test_repository;
@@ -36,11 +39,22 @@ mod integ {
         (dir, repo)
     }
 
+    fn clone_repository(url: &str) -> (assert_fs::TempDir, Repository) {
+        let dir = assert_fs::TempDir::new().unwrap();
+        let path_str = dir.path().to_str().unwrap();
+        let repo = Repository::clone(&path_str, &url).unwrap();
+        (dir, repo)
+    }
+
     fn create_branch(repo: &Repository, name: &str) {
         repo.git("checkout", &["-b", name]).unwrap();
+        create_and_commit_file(&repo, name);
+    }
+
+    fn create_and_commit_file(repo: &Repository, name: &str) {
         File::create(repo.dir.to_owned() + "/" + name).unwrap();
         repo.git("add", &[name]).unwrap();
-        repo.git("commit", &["-m", "Create branch"]).unwrap();
+        repo.git("commit", &["-m", &format!("Create file {}", name)]).unwrap();
     }
 
     fn merge_branch(repo: &Repository, name: &str) {
@@ -128,5 +142,25 @@ mod integ {
             let branches = repo.list_branches().unwrap();
             assert_eq!(branches, ["master"].to_vec());
         }
+    }
+
+    #[test]
+    fn update_branch() {
+        // GIVEN a source repository
+        let (source_dir, source_repo) = create_repository();
+
+        // AND a clone of it
+        let (clone_dir, _clone_repo) = clone_repository(source_dir.path().to_str().unwrap());
+        let clone_dir_str = clone_dir.path().to_str().unwrap();
+
+        // AND a new commit in the source repository
+        create_and_commit_file(&source_repo, "new");
+
+        // WHEN git-bonsai runs in the clone
+        let result = run_git_bonsai(&clone_dir_str, &["-y"]);
+        assert_eq!(result, 0);
+
+        // THEN the clone repository now contains the new commit
+        clone_dir.child("new").assert(predicate::path::exists());
     }
 }
