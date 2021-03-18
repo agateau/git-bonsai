@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use crate::appui::{AppUi, BranchToDeleteInfo};
 use crate::batchappui::BatchAppUi;
@@ -129,46 +129,36 @@ impl<'a> App<'_> {
     }
 
     fn get_deletable_branches(&self) -> Result<Vec<BranchToDeleteInfo>, i32> {
-        let branches = match self.repo.list_branches() {
+        let deletable_branches: Vec<BranchToDeleteInfo> = match self.repo.list_branches() {
             Ok(x) => x,
             Err(x) => {
                 self.ui.log_error("Failed to list branches");
                 return Err(x);
             }
-        };
-
-        let mut to_delete: HashMap<String, HashSet<String>> = HashMap::new();
-        for branch in &branches {
-            if self.protected_branches.contains(branch) {
-                continue;
-            }
-            let contained_in = match self.repo.list_branches_containing(&branch) {
+        }
+        .iter()
+        .filter(|&x| !self.protected_branches.contains(x))
+        .map(|branch| {
+            let contained_in : HashSet<String> = match self.repo.list_branches_containing(&branch) {
                 Ok(x) => x,
-                Err(x) => {
+                Err(_x) => {
                     self.ui
                         .log_error(&format!("Failed to list branches containing {}", branch));
-                    return Err(x);
+                    [].to_vec()
                 }
             }
             .iter()
-            .filter(|x| x != &branch)
+            .filter(|&x| x != branch)
             .map(|x| x.clone())
-            .collect::<HashSet<String>>();
+            .collect();
 
-            if contained_in.is_empty() {
-                continue;
+            BranchToDeleteInfo {
+                name: branch.to_string(),
+                contained_in: contained_in,
             }
-            to_delete.insert(branch.to_string(), contained_in);
-        }
-
-        // Create our final list
-        let deletable_branches = to_delete
-            .iter()
-            .map(|(name, contained_in)| BranchToDeleteInfo {
-                name: name.to_string(),
-                contained_in: contained_in.clone(),
-            })
-            .collect::<Vec<BranchToDeleteInfo>>();
+        })
+        .filter(|x| !x.contained_in.is_empty())
+        .collect();
 
         Ok(deletable_branches)
     }
