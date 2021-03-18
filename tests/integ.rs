@@ -54,7 +54,8 @@ mod integ {
     fn create_and_commit_file(repo: &Repository, name: &str) {
         File::create(repo.dir.to_owned() + "/" + name).unwrap();
         repo.git("add", &[name]).unwrap();
-        repo.git("commit", &["-m", &format!("Create file {}", name)]).unwrap();
+        repo.git("commit", &["-m", &format!("Create file {}", name)])
+            .unwrap();
     }
 
     fn merge_branch(repo: &Repository, name: &str) {

@@ -62,7 +62,7 @@ impl Repository {
         let repo = Repository::new(dir);
         match repo.git("clone", &[url, dir]) {
             Ok(_x) => Ok(repo),
-            Err(x) => Err(x)
+            Err(x) => Err(x),
         }
     }
 

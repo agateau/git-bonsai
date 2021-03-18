@@ -145,10 +145,15 @@ impl<'a> App<'_> {
             let contained_in = match self.repo.list_branches_containing(&branch) {
                 Ok(x) => x,
                 Err(x) => {
-                    self.ui.log_error(&format!("Failed to list branches containing {}", branch));
+                    self.ui
+                        .log_error(&format!("Failed to list branches containing {}", branch));
                     return Err(x);
                 }
-            }.iter().filter(|x| x != &branch).map(|x| x.clone()).collect::<HashSet<String>>();
+            }
+            .iter()
+            .filter(|x| x != &branch)
+            .map(|x| x.clone())
+            .collect::<HashSet<String>>();
 
             if contained_in.is_empty() {
                 continue;
