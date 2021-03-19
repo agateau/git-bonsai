@@ -24,14 +24,14 @@ use crate::cliargs::CliArgs;
 use crate::git::{BranchRestorer, Repository};
 use crate::interactiveappui::InteractiveAppUi;
 
-pub struct App<'a> {
+pub struct App {
     repo: Repository,
     protected_branches: HashSet<String>,
-    ui: &'a dyn AppUi,
+    ui: Box<dyn AppUi>,
 }
 
-impl<'a> App<'_> {
-    pub fn new(args: &CliArgs, ui: &'a dyn AppUi, repo_dir: &str) -> App<'a> {
+impl App {
+    pub fn new(args: &CliArgs, ui: Box<dyn AppUi>, repo_dir: &str) -> App {
         let mut branches: HashSet<String> = HashSet::new();
         branches.insert("master".to_string());
         for branch in &args.excluded {
@@ -169,7 +169,7 @@ pub fn run(args: CliArgs, dir: &str) -> i32 {
         false => Box::new(InteractiveAppUi {}),
         true => Box::new(BatchAppUi {}),
     };
-    let app = App::new(&args, &*ui, &dir);
+    let app = App::new(&args, ui, &dir);
 
     if !app.is_working_tree_clean() {
         return 1;
