@@ -147,8 +147,15 @@ impl Repository {
         }
     }
 
-    pub fn delete_branch(&self, branch: &str) -> Result<(), i32> {
-        match self.git("branch", &["-d", branch]) {
+    pub fn safe_delete_branch(&self, branch: &str) -> Result<(), i32> {
+        // A branch is only safe to delete if at least another branch contains it
+        let contained_in = self.list_branches_containing(branch).unwrap();
+        if contained_in.len() < 2 {
+            println!("Not deleting {}, no other branches contain it", branch);
+            // TODO: switch to real errors
+            return Err(1);
+        }
+        match self.git("branch", &["-D", branch]) {
             Ok(_x) => Ok(()),
             Err(x) => Err(x),
         }
@@ -222,5 +229,51 @@ mod tests {
         repo.git("checkout", &["-b", "test"])
             .expect("create branch failed");
         assert_eq!(repo.get_current_branch().unwrap(), "test");
+    }
+
+    #[test]
+    fn safe_delete_branch() {
+        // GIVEN a repository with a test branch equals to master
+        let dir = assert_fs::TempDir::new().unwrap();
+        let path_str = dir.path().to_str().unwrap();
+        let repo = create_test_repository(path_str);
+        assert_eq!(repo.get_current_branch().unwrap(), "master");
+
+        repo.git("branch", &["test"]).unwrap();
+
+        // WHEN I call safe_delete_branch
+        let result = repo.safe_delete_branch("test");
+
+        // THEN it succeeds
+        assert_eq!(result, Ok(()));
+
+        // AND only the master branch remains
+        assert_eq!(repo.list_branches().unwrap(), &["master"]);
+    }
+
+    #[test]
+    fn cant_delete_unique_branch() {
+        // GIVEN a repository with a test branch containing unique content
+        let dir = assert_fs::TempDir::new().unwrap();
+        let path_str = dir.path().to_str().unwrap();
+        let repo = create_test_repository(path_str);
+        assert_eq!(repo.get_current_branch().unwrap(), "master");
+
+        repo.git("checkout", &["-b", "test"]).unwrap();
+        File::create(path_str.to_owned() + "/test").unwrap();
+        repo.git("add", &["test"]).unwrap();
+        repo.git("commit", &["-m", &format!("Create file")])
+            .unwrap();
+
+        repo.checkout("master").unwrap();
+
+        // WHEN I call safe_delete_branch
+        let result = repo.safe_delete_branch("test");
+
+        // THEN it fails
+        assert_eq!(result, Err(1));
+
+        // AND the test branch still exists
+        assert_eq!(repo.list_branches().unwrap(), &["master", "test"]);
     }
 }
