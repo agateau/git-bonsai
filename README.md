@@ -23,27 +23,12 @@ precious:
 1. It refuses to run if there are any uncommitted changes. This includes
    unknown files.
 
-2. To ensure branches are safe to delete, Git Bonsai always deletes branches
-   using `git branch -d` not `git branch -D`. To do so, it switches to the
-   first branch containing the branch to delete before deleting it. For
-   example, given this git commit graph:
+2. It always prompt you before deleting any branch, and explains why this
+   branch is safe to remove.
 
-```
-    o          b2
-   / \
-  o---o--o     b1
- /        \
-o----------o-- master
+3. It refuses to delete a branch if it is not contained in another branch.
 
-```
-
-Git Bonsai detects branch `b2` can be deleted because `b1` and `master` contain
-it and `b1` can be deleted because `master` contains it.
-
-To delete them it first switches to `b1` and run `git branch -d b2`. Then it
-switches to `master` and run `git branch -d b1`.
-
-3. Git Bonsai never touches the remote repository.
+4. Git Bonsai never touches the remote repository.
 
 ## Installation
 

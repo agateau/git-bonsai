@@ -112,16 +112,29 @@ impl App {
             return Ok(());
         }
 
-        let _restorer = BranchRestorer::new(&self.repo);
+        let current_branch = self.repo.get_current_branch().unwrap();
         for branch_info in &selected_branches {
-            self.ui.log_info(&format!("Deleting {}", branch_info.name));
-            let contained_in = &branch_info.contained_in;
-            let container = contained_in.iter().next().unwrap();
-            if self.repo.checkout(container).is_err() {
-                self.ui.log_warning("Failed to checkout branch");
-                continue;
+            if branch_info.name == current_branch {
+                let fallback_branch = match self.protected_branches.iter().next() {
+                    Some(x) => x,
+                    None => {
+                        self.ui.log_warning(
+                            "No fallback branch to switch to before deleting the current branch",
+                        );
+                        continue;
+                    }
+                };
+                self.ui.log_info(&format!(
+                    "Switching to {} before deleting {}",
+                    fallback_branch, branch_info.name
+                ));
+                if self.repo.checkout(fallback_branch).is_err() {
+                    self.ui.log_warning("Failed to switch to fallback branch");
+                    continue;
+                }
             }
-            if self.repo.delete_branch(&branch_info.name).is_err() {
+            self.ui.log_info(&format!("Deleting {}", branch_info.name));
+            if self.repo.safe_delete_branch(&branch_info.name).is_err() {
                 self.ui.log_warning("Failed to delete branch");
             }
         }
@@ -139,7 +152,7 @@ impl App {
         .iter()
         .filter(|&x| !self.protected_branches.contains(x))
         .map(|branch| {
-            let contained_in : HashSet<String> = match self.repo.list_branches_containing(&branch) {
+            let contained_in: HashSet<String> = match self.repo.list_branches_containing(&branch) {
                 Ok(x) => x,
                 Err(_x) => {
                     self.ui
