@@ -27,7 +27,8 @@ mod integ {
     use assert_fs::prelude::*;
     use predicates::prelude::*;
 
-    use git_bonsai::app;
+    use git_bonsai::app::{self, App};
+    use git_bonsai::batchappui::BatchAppUi;
     use git_bonsai::cliargs::CliArgs;
     use git_bonsai::git::create_test_repository;
     use git_bonsai::git::Repository;
@@ -68,6 +69,12 @@ mod integ {
         full_argv.extend(argv);
         let args = CliArgs::from_iter(full_argv);
         app::run(args, &cwd)
+    }
+
+    fn create_app(cwd: &str) -> App {
+        let ui = Box::new(BatchAppUi {});
+        let args = CliArgs::from_iter(vec!["git-bonsai"]);
+        App::new(&args, ui, &cwd)
     }
 
     fn assert_branches_eq(repo: &Repository, expected_branches: &[&str]) {
@@ -153,5 +160,42 @@ mod integ {
 
         // THEN the clone repository now contains the new commit
         clone_dir.child("new").assert(predicate::path::exists());
+    }
+
+    #[test]
+    fn identical_sha1_no_other_branch() {
+        // GIVEN a repository with three branches pointing to the same sha1, contained in no other
+        // branch
+        let (dir, repo) = create_repository();
+        let path_str = dir.path().to_str().unwrap();
+        create_branch(&repo, "topic1");
+        repo.git("branch", &["topic2", "topic1"]).unwrap();
+        repo.git("branch", &["topic3", "topic1"]).unwrap();
+
+        // WHEN git-bonsai runs
+        let app = create_app(&path_str);
+        let result = app.remove_identical_branches();
+        assert_eq!(result, Ok(()));
+
+        // THEN only the first alias branch remains
+        assert_branches_eq(&repo, &["master", "topic1"]);
+    }
+
+    #[test]
+    fn identical_sha1_contained_in_master() {
+        // GIVEN a repository with two branches pointing to the same sha1, contained in the master
+        // branch
+        let (dir, repo) = create_repository();
+        let path_str = dir.path().to_str().unwrap();
+        repo.git("branch", &["topic1"]).unwrap();
+        repo.git("branch", &["topic2"]).unwrap();
+
+        // WHEN git-bonsai runs
+        let app = create_app(&path_str);
+        let result = app.remove_identical_branches();
+        assert_eq!(result, Ok(()));
+
+        // THEN only the master branch remains
+        assert_branches_eq(&repo, &["master"]);
     }
 }
