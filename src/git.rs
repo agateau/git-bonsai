@@ -313,7 +313,8 @@ mod tests {
         repo.git("checkout", &["-b", "test"]).unwrap();
         File::create(path_str.to_owned() + "/test").unwrap();
         repo.git("add", &["test"]).unwrap();
-        repo.git("commit", &["-m", &format!("Create file")]).unwrap();
+        repo.git("commit", &["-m", &format!("Create file")])
+            .unwrap();
 
         // WHEN I list branches with sha1
         let branches_with_sha1 = repo.list_branches_with_sha1s().unwrap();

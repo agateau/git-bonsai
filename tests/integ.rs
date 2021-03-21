@@ -71,9 +71,11 @@ mod integ {
         app::run(args, &cwd)
     }
 
-    fn create_app(cwd: &str) -> App {
+    fn create_app(cwd: &str, argv: &[&str]) -> App {
+        let mut full_argv = vec!["git-bonsai"];
+        full_argv.extend(argv);
         let ui = Box::new(BatchAppUi {});
-        let args = CliArgs::from_iter(vec!["git-bonsai"]);
+        let args = CliArgs::from_iter(full_argv);
         App::new(&args, ui, &cwd)
     }
 
@@ -109,8 +111,11 @@ mod integ {
         assert_branches_eq(&repo, &["master", "topic1", "topic2"]);
 
         // WHEN git-bonsai runs
-        let result = run_git_bonsai(&path_str, &["-y"]);
-        assert_eq!(result, 0);
+        {
+            let app = create_app(&path_str, &[]);
+            let result = app.remove_merged_branches();
+            assert_eq!(result, Ok(()));
+        }
 
         // THEN only the topic1 branch has been removed
         assert_branches_eq(&repo, &["master", "topic2"]);
@@ -128,15 +133,21 @@ mod integ {
         assert_branches_eq(&repo, &["master", "protected"]);
 
         // WHEN git-bonsai runs with "-x protected"
-        let result = run_git_bonsai(&path_str, &["-y", "-x", "protected"]);
-        assert_eq!(result, 0);
+        {
+            let app = create_app(&path_str, &["-x", "protected"]);
+            let result = app.remove_merged_branches();
+            assert_eq!(result, Ok(()));
+        }
 
         // THEN the protected branch is still there
         assert_branches_eq(&repo, &["master", "protected"]);
 
         // WHEN git-bonsai runs without "-x protected"
-        let result = run_git_bonsai(&path_str, &["-y"]);
-        assert_eq!(result, 0);
+        {
+            let app = create_app(&path_str, &[]);
+            let result = app.remove_merged_branches();
+            assert_eq!(result, Ok(()));
+        }
 
         // THEN the protected branch is gone
         assert_branches_eq(&repo, &["master"]);
@@ -173,11 +184,11 @@ mod integ {
         repo.git("branch", &["topic3", "topic1"]).unwrap();
 
         // WHEN git-bonsai runs
-        let app = create_app(&path_str);
-        let result = app.remove_identical_branches();
+        let app = create_app(&path_str, &[]);
+        let result = app.delete_identical_branches();
         assert_eq!(result, Ok(()));
 
-        // THEN only the first alias branch remains
+        // THEN only the first topic branch remains
         assert_branches_eq(&repo, &["master", "topic1"]);
     }
 
@@ -191,8 +202,8 @@ mod integ {
         repo.git("branch", &["topic2"]).unwrap();
 
         // WHEN git-bonsai runs
-        let app = create_app(&path_str);
-        let result = app.remove_identical_branches();
+        let app = create_app(&path_str, &[]);
+        let result = app.delete_identical_branches();
         assert_eq!(result, Ok(()));
 
         // THEN only the master branch remains
