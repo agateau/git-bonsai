@@ -19,12 +19,14 @@
 #[cfg(test)]
 mod integ {
     extern crate assert_fs;
+    extern crate claim;
     extern crate git_bonsai;
 
     use std::fs::File;
     use structopt::StructOpt;
 
     use assert_fs::prelude::*;
+    use claim::*;
     use predicates::prelude::*;
 
     use git_bonsai::app::{self, App};
@@ -113,8 +115,7 @@ mod integ {
         // WHEN git-bonsai runs
         {
             let app = create_app(&path_str, &[]);
-            let result = app.remove_merged_branches();
-            assert_eq!(result, Ok(()));
+            assert_ok!(app.remove_merged_branches());
         }
 
         // THEN only the topic1 branch has been removed
@@ -135,8 +136,7 @@ mod integ {
         // WHEN git-bonsai runs with "-x protected"
         {
             let app = create_app(&path_str, &["-x", "protected"]);
-            let result = app.remove_merged_branches();
-            assert_eq!(result, Ok(()));
+            assert_ok!(app.remove_merged_branches());
         }
 
         // THEN the protected branch is still there
@@ -145,8 +145,7 @@ mod integ {
         // WHEN git-bonsai runs without "-x protected"
         {
             let app = create_app(&path_str, &[]);
-            let result = app.remove_merged_branches();
-            assert_eq!(result, Ok(()));
+            assert_ok!(app.remove_merged_branches());
         }
 
         // THEN the protected branch is gone
@@ -185,8 +184,7 @@ mod integ {
 
         // WHEN git-bonsai runs
         let app = create_app(&path_str, &[]);
-        let result = app.delete_identical_branches();
-        assert_eq!(result, Ok(()));
+        assert_ok!(app.delete_identical_branches());
 
         // THEN only the first topic branch remains
         assert_branches_eq(&repo, &["master", "topic1"]);
@@ -203,8 +201,7 @@ mod integ {
 
         // WHEN git-bonsai runs
         let app = create_app(&path_str, &[]);
-        let result = app.delete_identical_branches();
-        assert_eq!(result, Ok(()));
+        assert_ok!(app.delete_identical_branches());
 
         // THEN only the master branch remains
         assert_branches_eq(&repo, &["master"]);
