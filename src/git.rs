@@ -106,6 +106,21 @@ impl Repository {
         self.list_branches_internal(&[])
     }
 
+    pub fn list_branches_with_sha1s(&self) -> Result<Vec<(String, String)>, i32> {
+        let mut list: Vec<(String, String)> = Vec::new();
+        let lines = match self.list_branches_internal(&["-v"]) {
+            Ok(x) => x,
+            Err(x) => return Err(x),
+        };
+        for line in lines {
+            let mut it = line.split_whitespace();
+            let branch = it.next().unwrap().to_string();
+            let sha1 = it.next().unwrap().to_string();
+            list.push((branch, sha1));
+        }
+        Ok(list)
+    }
+
     fn list_branches_internal(&self, args: &[&str]) -> Result<Vec<String>, i32> {
         let mut branches: Vec<String> = Vec::new();
 
@@ -192,6 +207,17 @@ impl Repository {
         let has_changes = !stdout.unwrap().is_empty();
         Ok(has_changes)
     }
+
+    #[allow(dead_code)]
+    pub fn get_current_sha1(&self) -> Result<String, i32> {
+        match self.git("show", &["--no-patch", "--oneline"]) {
+            Ok(out) => {
+                let sha1 = out.split(' ').next().unwrap();
+                Ok(sha1.to_string())
+            }
+            Err(x) => Err(x),
+        }
+    }
 }
 
 // Used by test code
@@ -275,5 +301,31 @@ mod tests {
 
         // AND the test branch still exists
         assert_eq!(repo.list_branches().unwrap(), &["master", "test"]);
+    }
+
+    #[test]
+    fn list_branches_with_sha1s() {
+        // GIVEN a repository with two branches
+        let dir = assert_fs::TempDir::new().unwrap();
+        let path_str = dir.path().to_str().unwrap();
+        let repo = create_test_repository(path_str);
+
+        repo.git("checkout", &["-b", "test"]).unwrap();
+        File::create(path_str.to_owned() + "/test").unwrap();
+        repo.git("add", &["test"]).unwrap();
+        repo.git("commit", &["-m", &format!("Create file")])
+            .unwrap();
+
+        // WHEN I list branches with sha1
+        let branches_with_sha1 = repo.list_branches_with_sha1s().unwrap();
+
+        // THEN the list contains two entries
+        assert_eq!(branches_with_sha1.len(), 2);
+
+        // AND when switching to each branch, the current sha1 is the expected one
+        for (branch, sha1) in branches_with_sha1 {
+            repo.git("checkout", &[&branch]).unwrap();
+            assert_eq!(repo.get_current_sha1().unwrap(), sha1);
+        }
     }
 }

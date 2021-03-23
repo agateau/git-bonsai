@@ -40,4 +40,15 @@ impl AppUi for BatchAppUi {
     ) -> Vec<BranchToDeleteInfo> {
         branch_infos.to_vec()
     }
+
+    fn select_identical_branches_to_delete(&self, branches: &[String]) -> Vec<String> {
+        branches.to_vec()
+    }
+
+    fn select_identical_branches_to_delete_keep_one(&self, branches: &[String]) -> Vec<String> {
+        let mut to_delete = branches.to_vec();
+        to_delete.sort();
+        to_delete.remove(0);
+        to_delete
+    }
 }

@@ -19,15 +19,18 @@
 #[cfg(test)]
 mod integ {
     extern crate assert_fs;
+    extern crate claim;
     extern crate git_bonsai;
 
     use std::fs::File;
     use structopt::StructOpt;
 
     use assert_fs::prelude::*;
+    use claim::*;
     use predicates::prelude::*;
 
-    use git_bonsai::app;
+    use git_bonsai::app::{self, App};
+    use git_bonsai::batchappui::BatchAppUi;
     use git_bonsai::cliargs::CliArgs;
     use git_bonsai::git::create_test_repository;
     use git_bonsai::git::Repository;
@@ -70,9 +73,19 @@ mod integ {
         app::run(args, &cwd)
     }
 
-    fn assert_branches_eq(repo: &Repository, expected_branches: &[&str]) {
-        let branches = repo.list_branches().unwrap();
-        assert_eq!(branches, expected_branches);
+    fn create_app(cwd: &str, argv: &[&str]) -> App {
+        let mut full_argv = vec!["git-bonsai"];
+        full_argv.extend(argv);
+        let ui = Box::new(BatchAppUi {});
+        let args = CliArgs::from_iter(full_argv);
+        App::new(&args, ui, &cwd)
+    }
+
+    macro_rules! assert_branches_eq {
+        ($repo:expr, $expected_branches:expr) => {
+            let branches = $repo.list_branches().unwrap();
+            assert_eq!(branches, $expected_branches);
+        }
     }
 
     #[test]
@@ -99,14 +112,16 @@ mod integ {
         repo.checkout("master").unwrap();
         merge_branch(&repo, "topic1");
 
-        assert_branches_eq(&repo, &["master", "topic1", "topic2"]);
+        assert_branches_eq!(&repo, &["master", "topic1", "topic2"]);
 
         // WHEN git-bonsai runs
-        let result = run_git_bonsai(&path_str, &["-y"]);
-        assert_eq!(result, 0);
+        {
+            let app = create_app(&path_str, &[]);
+            assert_ok!(app.remove_merged_branches());
+        }
 
         // THEN only the topic1 branch has been removed
-        assert_branches_eq(&repo, &["master", "topic2"]);
+        assert_branches_eq!(&repo, &["master", "topic2"]);
     }
 
     #[test]
@@ -118,21 +133,25 @@ mod integ {
         repo.checkout("master").unwrap();
         merge_branch(&repo, "protected");
 
-        assert_branches_eq(&repo, &["master", "protected"]);
+        assert_branches_eq!(&repo, &["master", "protected"]);
 
         // WHEN git-bonsai runs with "-x protected"
-        let result = run_git_bonsai(&path_str, &["-y", "-x", "protected"]);
-        assert_eq!(result, 0);
+        {
+            let app = create_app(&path_str, &["-x", "protected"]);
+            assert_ok!(app.remove_merged_branches());
+        }
 
         // THEN the protected branch is still there
-        assert_branches_eq(&repo, &["master", "protected"]);
+        assert_branches_eq!(&repo, &["master", "protected"]);
 
         // WHEN git-bonsai runs without "-x protected"
-        let result = run_git_bonsai(&path_str, &["-y"]);
-        assert_eq!(result, 0);
+        {
+            let app = create_app(&path_str, &[]);
+            assert_ok!(app.remove_merged_branches());
+        }
 
         // THEN the protected branch is gone
-        assert_branches_eq(&repo, &["master"]);
+        assert_branches_eq!(&repo, &["master"]);
     }
 
     #[test]
@@ -153,5 +172,40 @@ mod integ {
 
         // THEN the clone repository now contains the new commit
         clone_dir.child("new").assert(predicate::path::exists());
+    }
+
+    #[test]
+    fn identical_sha1_no_other_branch() {
+        // GIVEN a repository with three branches pointing to the same sha1, contained in no other
+        // branch
+        let (dir, repo) = create_repository();
+        let path_str = dir.path().to_str().unwrap();
+        create_branch(&repo, "topic1");
+        repo.git("branch", &["topic2", "topic1"]).unwrap();
+        repo.git("branch", &["topic3", "topic1"]).unwrap();
+
+        // WHEN git-bonsai runs
+        let app = create_app(&path_str, &[]);
+        assert_ok!(app.delete_identical_branches());
+
+        // THEN only the first topic branch remains
+        assert_branches_eq!(&repo, &["master", "topic1"]);
+    }
+
+    #[test]
+    fn identical_sha1_contained_in_master() {
+        // GIVEN a repository with two branches pointing to the same sha1, contained in the master
+        // branch
+        let (dir, repo) = create_repository();
+        let path_str = dir.path().to_str().unwrap();
+        repo.git("branch", &["topic1"]).unwrap();
+        repo.git("branch", &["topic2"]).unwrap();
+
+        // WHEN git-bonsai runs
+        let app = create_app(&path_str, &[]);
+        assert_ok!(app.delete_identical_branches());
+
+        // THEN only the master branch remains
+        assert_branches_eq!(&repo, &["master"]);
     }
 }

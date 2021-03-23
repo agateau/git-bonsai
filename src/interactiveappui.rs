@@ -61,4 +61,40 @@ impl AppUi for InteractiveAppUi {
             .map(|&x| branch_infos[x].clone())
             .collect::<Vec<BranchToDeleteInfo>>()
     }
+
+    fn select_identical_branches_to_delete(&self, branches: &[String]) -> Vec<String> {
+        let mut items = branches.to_vec();
+        items.sort();
+
+        let selections = tui::select(
+            "These branches point to the same commit, which is contained in another branch,\
+            so it is safe to delete them all.\n\
+            Select branches to delete", &items);
+
+        selections
+            .iter()
+            .map(|&x| items[x].clone())
+            .collect::<Vec<String>>()
+    }
+
+    fn select_identical_branches_to_delete_keep_one(&self, branches: &[String]) -> Vec<String> {
+        let mut items = branches.to_vec();
+        items.sort();
+
+        let mut selections: Vec<usize>;
+        println!("These branches point to the same commit, but no other branch contains this commit, \
+                so you can delete all of them but one.\n");
+        loop {
+            selections = tui::select("Select branches to delete", &items);
+            if selections.len() == items.len() {
+                self.log_error("You must leave at least one branch unchecked.");
+            } else {
+                break;
+            }
+        }
+        selections
+            .iter()
+            .map(|&x| items[x].clone())
+            .collect::<Vec<String>>()
+    }
 }
