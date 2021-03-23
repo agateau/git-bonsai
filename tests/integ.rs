@@ -81,9 +81,11 @@ mod integ {
         App::new(&args, ui, &cwd)
     }
 
-    fn assert_branches_eq(repo: &Repository, expected_branches: &[&str]) {
-        let branches = repo.list_branches().unwrap();
-        assert_eq!(branches, expected_branches);
+    macro_rules! assert_branches_eq {
+        ($repo:expr, $expected_branches:expr) => {
+            let branches = $repo.list_branches().unwrap();
+            assert_eq!(branches, $expected_branches);
+        }
     }
 
     #[test]
@@ -110,7 +112,7 @@ mod integ {
         repo.checkout("master").unwrap();
         merge_branch(&repo, "topic1");
 
-        assert_branches_eq(&repo, &["master", "topic1", "topic2"]);
+        assert_branches_eq!(&repo, &["master", "topic1", "topic2"]);
 
         // WHEN git-bonsai runs
         {
@@ -119,7 +121,7 @@ mod integ {
         }
 
         // THEN only the topic1 branch has been removed
-        assert_branches_eq(&repo, &["master", "topic2"]);
+        assert_branches_eq!(&repo, &["master", "topic2"]);
     }
 
     #[test]
@@ -131,7 +133,7 @@ mod integ {
         repo.checkout("master").unwrap();
         merge_branch(&repo, "protected");
 
-        assert_branches_eq(&repo, &["master", "protected"]);
+        assert_branches_eq!(&repo, &["master", "protected"]);
 
         // WHEN git-bonsai runs with "-x protected"
         {
@@ -140,7 +142,7 @@ mod integ {
         }
 
         // THEN the protected branch is still there
-        assert_branches_eq(&repo, &["master", "protected"]);
+        assert_branches_eq!(&repo, &["master", "protected"]);
 
         // WHEN git-bonsai runs without "-x protected"
         {
@@ -149,7 +151,7 @@ mod integ {
         }
 
         // THEN the protected branch is gone
-        assert_branches_eq(&repo, &["master"]);
+        assert_branches_eq!(&repo, &["master"]);
     }
 
     #[test]
@@ -187,7 +189,7 @@ mod integ {
         assert_ok!(app.delete_identical_branches());
 
         // THEN only the first topic branch remains
-        assert_branches_eq(&repo, &["master", "topic1"]);
+        assert_branches_eq!(&repo, &["master", "topic1"]);
     }
 
     #[test]
@@ -204,6 +206,6 @@ mod integ {
         assert_ok!(app.delete_identical_branches());
 
         // THEN only the master branch remains
-        assert_branches_eq(&repo, &["master"]);
+        assert_branches_eq!(&repo, &["master"]);
     }
 }
