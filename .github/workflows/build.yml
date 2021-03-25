@@ -1,12 +1,6 @@
 name: Build
 
-on:
-  push:
-    branches:
-    - master
-    - dev
-    tags: "[0-9]*"
-  pull_request:
+on: [push, pull_request]
 
 jobs:
   build:
@@ -18,24 +12,12 @@ jobs:
     - name: Run tests
       run: ci/run-tests
     - name: Create archive
-      shell: bash
-      run: |
-        # `git describe --always` returns a sha1 when called here, even when building a tag.
-        # Use https://github.community/t5/GitHub-Actions/How-to-get-just-the-tag-name/m-p/32167/highlight/true#M1027
-        # as a workaround when building a tag
-        case "$GITHUB_REF" in
-        refs/tags/*)
-            export VERSION=${GITHUB_REF/refs\/tags\//}
-            ;;
-        *)
-            ;;
-        esac
-        ci/create-archive
-    - name: Set archive name
-      shell: bash
-      run: |
-        echo "ARCHIVE_NAME=$(cat artifacts/archive-name)" >> $GITHUB_ENV
-    - uses: actions/upload-artifact@v1
-      with:
-        name: ${{ env.ARCHIVE_NAME }}
-        path: "artifacts/${{ env.ARCHIVE_NAME }}"
+      if: github.ref == 'refs/heads/master'
+      run: ci/create-archive
+    - name: Upload
+      if: github.ref == 'refs/heads/master'
+      run: ci/upload-build git-bonsai artifacts/*.bz2
+      env:
+        UPLOAD_USERNAME: ${{ secrets.UPLOAD_USERNAME }}
+        UPLOAD_PRIVATE_KEY: ${{ secrets.UPLOAD_PRIVATE_KEY }}
+        UPLOAD_HOSTNAME: ${{ secrets.UPLOAD_HOSTNAME }}

@@ -109,9 +109,15 @@ $ git log --oneline --all --graph
 
 ## Installation
 
+### Stable version
+
 The easiest way to install is to download an archive from the [release page][release], unpack it and copy the `git-bonsai` binary in a directory in `$PATH`.
 
 [release]: https://github.com/agateau/git-bonsai/releases
+
+### Git snapshots
+
+Snapshots from the master branch are available from [builds.agateau.com/git-bonsai](https://builds.agateau.com/git-bonsai).
 
 ## Building it
 
