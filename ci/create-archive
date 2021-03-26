@@ -6,17 +6,15 @@ cd $(dirname $0)/..
 APP_NAME=git-bonsai
 DATA_FILES="README.md CHANGELOG.md LICENSE"
 
-set +u
 # Let caller define VERSION through an environment variable
-if [ -z "$VERSION" ] ; then
-    VERSION=$(git describe --always)
+if [ -z "${VERSION:-}" ] ; then
+    VERSION=$(cargo pkgid | sed 's/.*#//')
+    VERSION=$VERSION+$(git show --no-patch --format=%cd-%h --date=format:%Y%d%mT%H%M%S)
 fi
-set -u
 
 ARTIFACTS_DIR=$PWD/artifacts
 ARCHIVE_DIR=$APP_NAME-$VERSION
 ARCHIVE_NAME=$APP_NAME-$VERSION.tar.bz2
-ARCHIVE_NAME_FILE=$ARTIFACTS_DIR/archive-name
 
 rm -rf $ARTIFACTS_DIR
 mkdir -p $ARTIFACTS_DIR/$ARCHIVE_DIR
@@ -25,11 +23,9 @@ echo "Copying and stripping binary"
 cp target/release/$APP_NAME $ARTIFACTS_DIR/$ARCHIVE_DIR
 strip $ARTIFACTS_DIR/$ARCHIVE_DIR/$APP_NAME
 
-echo "Copying data file"
+echo "Copying data files"
 cp $DATA_FILES $ARTIFACTS_DIR/$ARCHIVE_DIR
 
 echo "Creating archive $ARTIFACTS_DIR/$ARCHIVE_NAME"
-( cd $ARTIFACTS_DIR && tar -cjf $ARCHIVE_NAME $ARCHIVE_DIR )
-
-echo "Storing archive name in $ARCHIVE_NAME_FILE"
-echo $ARCHIVE_NAME > $ARCHIVE_NAME_FILE
+cd $ARTIFACTS_DIR
+tar -cjf $ARCHIVE_NAME $ARCHIVE_DIR
