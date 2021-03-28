@@ -4,16 +4,32 @@ on: [push, pull_request]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+        - ubuntu-18.04
+        - macos-10.15
+        - windows-2019
+
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: bash
+
     steps:
     - uses: actions/checkout@v2
+
     - name: Build
       run: ci/build-app
+
     - name: Run tests
       run: ci/run-tests
+
     - name: Create archive
-      if: github.ref == 'refs/heads/master'
       run: ci/create-archive
+
     - name: Upload
       if: github.ref == 'refs/heads/master'
       run: ci/upload-build git-bonsai artifacts/*.bz2
