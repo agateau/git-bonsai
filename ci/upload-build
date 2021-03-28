@@ -70,9 +70,6 @@ check_var UPLOAD_USERNAME
 check_var UPLOAD_PRIVATE_KEY
 check_var UPLOAD_HOSTNAME
 
-echo "Computing sha512 sums"
-sha512sum $build_files
-
 echo "Uploading"
 eval $(ssh-agent)
 echo "$UPLOAD_PRIVATE_KEY" | ssh-add -
