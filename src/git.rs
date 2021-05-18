@@ -16,8 +16,12 @@
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+use std::env;
 use std::fs::File;
 use std::process::Command;
+
+// Define this environment variable to print all executed git commands to stderr
+const GIT_BONSAI_DEBUG: &str = "GB_DEBUG";
 
 /**
  * Restores the current git branch when dropped
@@ -73,6 +77,9 @@ impl Repository {
         cmd.arg(subcommand);
         for arg in args {
             cmd.arg(arg);
+        }
+        if env::var(GIT_BONSAI_DEBUG).is_ok() {
+            eprintln!("DEBUG: pwd={}: git {} {}", self.dir, subcommand, args.join(" "));
         }
         let output = match cmd.output() {
             Ok(x) => x,
