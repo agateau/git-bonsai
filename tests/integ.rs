@@ -210,7 +210,6 @@ mod integ {
     }
 
     #[test]
-    #[ignore]
     fn skip_worktree_branches() {
         // GIVEN a source repository with two branches
         let (source_dir, source_repo) = create_repository();

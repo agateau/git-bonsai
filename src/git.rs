@@ -23,6 +23,10 @@ use std::process::Command;
 // Define this environment variable to print all executed git commands to stderr
 const GIT_BONSAI_DEBUG: &str = "GB_DEBUG";
 
+// If a branch is checked out in a separate worktree, then `git branch` prefixes it with this
+// string
+const WORKTREE_BRANCH_PREFIX: &str = "+ ";
+
 /**
  * Restores the current git branch when dropped
  * Assumes we are on a real branch
@@ -136,6 +140,9 @@ impl Repository {
             Err(x) => return Err(x),
         };
         for line in stdout.lines() {
+            if line.starts_with(WORKTREE_BRANCH_PREFIX) {
+                continue;
+            }
             let branch = line.get(2..).expect("Invalid branch name");
             branches.push(branch.to_string());
         }
@@ -250,6 +257,7 @@ pub fn create_test_repository(repo_dir: &str) -> Repository {
 mod tests {
     extern crate assert_fs;
 
+    use std::fs;
     use super::*;
 
     #[test]
@@ -334,5 +342,34 @@ mod tests {
             repo.git("checkout", &[&branch]).unwrap();
             assert_eq!(repo.get_current_sha1().unwrap(), sha1);
         }
+    }
+
+    #[test]
+    fn list_branches_skip_worktree_branches() {
+        // GIVEN a source repository with two branches
+        let tmp_dir = assert_fs::TempDir::new().unwrap();
+        let tmp_path_str = tmp_dir.path().to_str().unwrap();
+
+        let source_path_str = tmp_path_str.to_owned() + "/source";
+        fs::create_dir_all(&source_path_str).unwrap();
+        let source_repo = create_test_repository(&source_path_str);
+        source_repo.git("branch", &["topic1"]).unwrap();
+
+        // AND a clone of this repository
+        let clone_path_str = tmp_path_str.to_owned() + "/clone";
+        fs::create_dir_all(&clone_path_str).unwrap();
+        let clone_repo = Repository::clone(&clone_path_str, &source_path_str).unwrap();
+
+        // with the topic1 branch checked-out in a separate worktree
+        let worktree_dir = assert_fs::TempDir::new().unwrap();
+        let worktree_path_str = worktree_dir.path().to_str().unwrap();
+        clone_repo.git("worktree", &["add", worktree_path_str, "topic1"]).unwrap();
+
+        // WHEN I list branches
+        let branches = clone_repo.list_branches().unwrap();
+
+        // THEN it does not list worktree branches
+        assert_eq!(branches.len(), 1);
+        assert_eq!(branches, &["master"]);
     }
 }
