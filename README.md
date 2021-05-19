@@ -127,6 +127,10 @@ Git Bonsai is written in [Rust][]. To build it, install Rust and then run:
 
 [Rust]: https://www.rust-lang.org
 
+## Debugging
+
+If you define the `GB_DEBUG` environment variable, Git Bonsai will print all the git commands it runs.
+
 ## Why yet another git cleaning tool?
 
 I created Git Bonsai because I wanted a tool like this but also as a way to learn Rust. There definitely are similar tools, probably more capable, and the Rust code probably needs work, pull requests are welcome!

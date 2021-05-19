@@ -208,4 +208,29 @@ mod integ {
         // THEN only the master branch remains
         assert_branches_eq!(&repo, &["master"]);
     }
+
+    #[test]
+    fn skip_worktree_branches() {
+        // GIVEN a source repository with two branches
+        let (source_dir, source_repo) = create_repository();
+        create_branch(&source_repo, "topic1");
+        source_repo.checkout("master").unwrap();
+
+        // AND a clone of this repository
+        let (clone_dir, clone_repo) = clone_repository(source_dir.path().to_str().unwrap());
+        let clone_path_str = clone_dir.path().to_str().unwrap();
+
+        // with the topic1 branch checked-out in a separate worktree
+        let worktree_dir = assert_fs::TempDir::new().unwrap();
+        let worktree_path_str = worktree_dir.path().to_str().unwrap();
+        clone_repo.git("worktree", &["add", worktree_path_str, "topic1"]).unwrap();
+
+        let worktree_repo = Repository::new(worktree_path_str);
+        worktree_repo.checkout("topic1").unwrap();
+
+        // WHEN git-bonsai updates the branches of the clone
+        // THEN it does not fail
+        let app = create_app(&clone_path_str, &[]);
+        assert_ok!(app.update_tracking_branches());
+    }
 }
