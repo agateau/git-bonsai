@@ -3,3 +3,7 @@ set -euo pipefail
 echo "Checking coding style"
 cargo fmt -- --check
 echo "OK"
+
+echo "Running clippy"
+cargo clippy -- --deny warnings
+echo "OK"

@@ -202,7 +202,7 @@ impl Repository {
             return None;
         }
         for line in stdout.unwrap().lines() {
-            if line.chars().nth(0) == Some('*') {
+            if line.starts_with('*') {
                 return Some(line[2..].to_string());
             }
         }
@@ -219,13 +219,11 @@ impl Repository {
         }
     }
 
-    pub fn has_changes(&self) -> Result<bool, ()> {
-        let stdout = self.git("status", &["--short"]);
-        if stdout.is_err() {
-            return Err(());
+    pub fn has_changes(&self) -> Result<bool, i32> {
+        match self.git("status", &["--short"]) {
+            Ok(out) => Ok(!out.is_empty()),
+            Err(x) => Err(x),
         }
-        let has_changes = !stdout.unwrap().is_empty();
-        Ok(has_changes)
     }
 
     #[allow(dead_code)]
