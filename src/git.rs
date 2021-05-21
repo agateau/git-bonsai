@@ -18,6 +18,7 @@
  */
 use std::env;
 use std::fs::File;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 // Define this environment variable to print all executed git commands to stderr
@@ -55,20 +56,20 @@ impl Drop for BranchRestorer<'_> {
 }
 
 pub struct Repository {
-    pub dir: String,
+    pub path: PathBuf,
 }
 
 impl Repository {
-    pub fn new(dir: &str) -> Repository {
+    pub fn new(path: &Path) -> Repository {
         Repository {
-            dir: dir.to_string(),
+            path: path.to_path_buf()
         }
     }
 
     #[allow(dead_code)]
-    pub fn clone(dir: &str, url: &str) -> Result<Repository, i32> {
-        let repo = Repository::new(dir);
-        match repo.git("clone", &[url, dir]) {
+    pub fn clone(path: &Path, url: &str) -> Result<Repository, i32> {
+        let repo = Repository::new(path);
+        match repo.git("clone", &[url, path.to_str().unwrap()]) {
             Ok(_x) => Ok(repo),
             Err(x) => Err(x),
         }
@@ -76,14 +77,14 @@ impl Repository {
 
     pub fn git(&self, subcommand: &str, args: &[&str]) -> Result<String, i32> {
         let mut cmd = Command::new("git");
-        cmd.current_dir(&self.dir);
+        cmd.current_dir(&self.path);
         cmd.env("LANG", "C");
         cmd.arg(subcommand);
         for arg in args {
             cmd.arg(arg);
         }
         if env::var(GIT_BONSAI_DEBUG).is_ok() {
-            eprintln!("DEBUG: pwd={}: git {} {}", self.dir, subcommand, args.join(" "));
+            eprintln!("DEBUG: pwd={}: git {} {}", self.path.to_str().unwrap(), subcommand, args.join(" "));
         }
         let output = match cmd.output() {
             Ok(x) => x,
@@ -236,8 +237,8 @@ impl Repository {
 
 // Used by test code
 #[allow(dead_code)]
-pub fn create_test_repository(repo_dir: &str) -> Repository {
-    let repo = Repository::new(repo_dir);
+pub fn create_test_repository(path: &Path) -> Repository {
+    let repo = Repository::new(path);
 
     repo.git("init", &[]).expect("init failed");
     repo.git("config", &["user.name", "test"])
@@ -246,7 +247,7 @@ pub fn create_test_repository(repo_dir: &str) -> Repository {
         .expect("setting email failed");
 
     // Create a file so that we have more than the start commit
-    File::create(repo_dir.to_owned() + "/f").unwrap();
+    File::create(path.join("f")).unwrap();
     repo.git("add", &["."]).expect("add failed");
     repo.git("commit", &["-m", "init"]).expect("commit failed");
 
@@ -263,8 +264,7 @@ mod tests {
     #[test]
     fn get_current_branch() {
         let dir = assert_fs::TempDir::new().unwrap();
-        let path_str = dir.path().to_str().unwrap();
-        let repo = create_test_repository(path_str);
+        let repo = create_test_repository(dir.path());
         assert_eq!(repo.get_current_branch().unwrap(), "master");
 
         repo.git("checkout", &["-b", "test"])
@@ -276,8 +276,7 @@ mod tests {
     fn safe_delete_branch() {
         // GIVEN a repository with a test branch equals to master
         let dir = assert_fs::TempDir::new().unwrap();
-        let path_str = dir.path().to_str().unwrap();
-        let repo = create_test_repository(path_str);
+        let repo = create_test_repository(dir.path());
         assert_eq!(repo.get_current_branch().unwrap(), "master");
 
         repo.git("branch", &["test"]).unwrap();
@@ -296,12 +295,11 @@ mod tests {
     fn cant_delete_unique_branch() {
         // GIVEN a repository with a test branch containing unique content
         let dir = assert_fs::TempDir::new().unwrap();
-        let path_str = dir.path().to_str().unwrap();
-        let repo = create_test_repository(path_str);
+        let repo = create_test_repository(dir.path());
         assert_eq!(repo.get_current_branch().unwrap(), "master");
 
         repo.git("checkout", &["-b", "test"]).unwrap();
-        File::create(path_str.to_owned() + "/test").unwrap();
+        File::create(dir.path().join("test")).unwrap();
         repo.git("add", &["test"]).unwrap();
         repo.git("commit", &["-m", &format!("Create file")])
             .unwrap();
@@ -322,11 +320,10 @@ mod tests {
     fn list_branches_with_sha1s() {
         // GIVEN a repository with two branches
         let dir = assert_fs::TempDir::new().unwrap();
-        let path_str = dir.path().to_str().unwrap();
-        let repo = create_test_repository(path_str);
+        let repo = create_test_repository(dir.path());
 
         repo.git("checkout", &["-b", "test"]).unwrap();
-        File::create(path_str.to_owned() + "/test").unwrap();
+        File::create(dir.path().join("test")).unwrap();
         repo.git("add", &["test"]).unwrap();
         repo.git("commit", &["-m", &format!("Create file")])
             .unwrap();
@@ -348,17 +345,16 @@ mod tests {
     fn list_branches_skip_worktree_branches() {
         // GIVEN a source repository with two branches
         let tmp_dir = assert_fs::TempDir::new().unwrap();
-        let tmp_path_str = tmp_dir.path().to_str().unwrap();
 
-        let source_path_str = tmp_path_str.to_owned() + "/source";
-        fs::create_dir_all(&source_path_str).unwrap();
-        let source_repo = create_test_repository(&source_path_str);
+        let source_path = tmp_dir.path().join("source");
+        fs::create_dir_all(&source_path).unwrap();
+        let source_repo = create_test_repository(&source_path);
         source_repo.git("branch", &["topic1"]).unwrap();
 
         // AND a clone of this repository
-        let clone_path_str = tmp_path_str.to_owned() + "/clone";
-        fs::create_dir_all(&clone_path_str).unwrap();
-        let clone_repo = Repository::clone(&clone_path_str, &source_path_str).unwrap();
+        let clone_path = tmp_dir.path().join("clone");
+        fs::create_dir_all(&clone_path).unwrap();
+        let clone_repo = Repository::clone(&clone_path, &source_path.to_str().unwrap()).unwrap();
 
         // with the topic1 branch checked-out in a separate worktree
         let worktree_dir = assert_fs::TempDir::new().unwrap();
