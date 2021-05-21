@@ -41,7 +41,7 @@ impl App {
         App {
             repo: Repository::new(&PathBuf::from(repo_dir)),
             protected_branches: branches,
-            ui: ui,
+            ui,
         }
     }
 
@@ -59,7 +59,7 @@ impl App {
                 }
                 true
             }
-            Err(()) => {
+            Err(_) => {
                 self.ui.log_error("Failed to get working tree status");
                 false
             }
@@ -113,11 +113,11 @@ impl App {
             return Ok(());
         }
 
-        let foo: Vec<String> = selected_branches
+        let branch_names: Vec<String> = selected_branches
             .iter()
             .map(|x| x.name.to_string())
             .collect();
-        self.delete_branches(&foo[..]);
+        self.delete_branches(&branch_names[..]);
         Ok(())
     }
 
@@ -175,12 +175,12 @@ impl App {
             }
             .iter()
             .filter(|&x| x != branch)
-            .map(|x| x.clone())
+            .cloned()
             .collect();
 
             BranchToDeleteInfo {
                 name: branch.to_string(),
-                contained_in: contained_in,
+                contained_in,
             }
         })
         .filter(|x| !x.contained_in.is_empty())
@@ -262,7 +262,7 @@ impl App {
         .for_each(|(branch, sha1)| {
             let branch_set = branches_for_sha1
                 .entry(sha1.to_string())
-                .or_insert(HashSet::<String>::new());
+                .or_insert_with(HashSet::<String>::new);
             branch_set.insert(branch.to_string());
         });
 

@@ -62,7 +62,7 @@ pub struct Repository {
 impl Repository {
     pub fn new(path: &Path) -> Repository {
         Repository {
-            path: path.to_path_buf()
+            path: path.to_path_buf(),
         }
     }
 
@@ -84,7 +84,12 @@ impl Repository {
             cmd.arg(arg);
         }
         if env::var(GIT_BONSAI_DEBUG).is_ok() {
-            eprintln!("DEBUG: pwd={}: git {} {}", self.path.to_str().unwrap(), subcommand, args.join(" "));
+            eprintln!(
+                "DEBUG: pwd={}: git {} {}",
+                self.path.to_str().unwrap(),
+                subcommand,
+                args.join(" ")
+            );
         }
         let output = match cmd.output() {
             Ok(x) => x,
@@ -197,7 +202,7 @@ impl Repository {
             return None;
         }
         for line in stdout.unwrap().lines() {
-            if line.chars().nth(0) == Some('*') {
+            if line.starts_with('*') {
                 return Some(line[2..].to_string());
             }
         }
@@ -214,13 +219,11 @@ impl Repository {
         }
     }
 
-    pub fn has_changes(&self) -> Result<bool, ()> {
-        let stdout = self.git("status", &["--short"]);
-        if stdout.is_err() {
-            return Err(());
+    pub fn has_changes(&self) -> Result<bool, i32> {
+        match self.git("status", &["--short"]) {
+            Ok(out) => Ok(!out.is_empty()),
+            Err(x) => Err(x),
         }
-        let has_changes = !stdout.unwrap().is_empty();
-        Ok(has_changes)
     }
 
     #[allow(dead_code)]
@@ -258,8 +261,8 @@ pub fn create_test_repository(path: &Path) -> Repository {
 mod tests {
     extern crate assert_fs;
 
-    use std::fs;
     use super::*;
+    use std::fs;
 
     #[test]
     fn get_current_branch() {
@@ -359,7 +362,9 @@ mod tests {
         // with the topic1 branch checked-out in a separate worktree
         let worktree_dir = assert_fs::TempDir::new().unwrap();
         let worktree_path_str = worktree_dir.path().to_str().unwrap();
-        clone_repo.git("worktree", &["add", worktree_path_str, "topic1"]).unwrap();
+        clone_repo
+            .git("worktree", &["add", worktree_path_str, "topic1"])
+            .unwrap();
 
         // WHEN I list branches
         let branches = clone_repo.list_branches().unwrap();

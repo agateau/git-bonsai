@@ -24,6 +24,9 @@ jobs:
     - name: Build
       run: ci/build-app
 
+    - name: Run static checks
+      run: ci/run-static-checks
+
     - name: Run tests
       run: ci/run-tests
 

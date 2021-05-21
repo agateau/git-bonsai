@@ -83,7 +83,7 @@ mod integ {
         ($repo:expr, $expected_branches:expr) => {
             let branches = $repo.list_branches().unwrap();
             assert_eq!(branches, $expected_branches);
-        }
+        };
     }
 
     #[test]
@@ -221,7 +221,9 @@ mod integ {
         // with the topic1 branch checked-out in a separate worktree
         let worktree_dir = assert_fs::TempDir::new().unwrap();
         let worktree_path_str = worktree_dir.path().to_str().unwrap();
-        clone_repo.git("worktree", &["add", worktree_path_str, "topic1"]).unwrap();
+        clone_repo
+            .git("worktree", &["add", worktree_path_str, "topic1"])
+            .unwrap();
 
         let worktree_repo = Repository::new(worktree_dir.path());
         worktree_repo.checkout("topic1").unwrap();
