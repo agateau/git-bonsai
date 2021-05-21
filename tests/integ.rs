@@ -37,15 +37,13 @@ mod integ {
 
     fn create_repository() -> (assert_fs::TempDir, Repository) {
         let dir = assert_fs::TempDir::new().unwrap();
-        let path_str = dir.path().to_str().unwrap();
-        let repo = create_test_repository(&path_str);
+        let repo = create_test_repository(dir.path());
         (dir, repo)
     }
 
     fn clone_repository(url: &str) -> (assert_fs::TempDir, Repository) {
         let dir = assert_fs::TempDir::new().unwrap();
-        let path_str = dir.path().to_str().unwrap();
-        let repo = Repository::clone(&path_str, &url).unwrap();
+        let repo = Repository::clone(dir.path(), &url).unwrap();
         (dir, repo)
     }
 
@@ -225,7 +223,7 @@ mod integ {
         let worktree_path_str = worktree_dir.path().to_str().unwrap();
         clone_repo.git("worktree", &["add", worktree_path_str, "topic1"]).unwrap();
 
-        let worktree_repo = Repository::new(worktree_path_str);
+        let worktree_repo = Repository::new(worktree_dir.path());
         worktree_repo.checkout("topic1").unwrap();
 
         // WHEN git-bonsai updates the branches of the clone

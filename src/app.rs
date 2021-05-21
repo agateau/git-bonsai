@@ -17,6 +17,7 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 
 use crate::appui::{AppUi, BranchToDeleteInfo};
 use crate::batchappui::BatchAppUi;
@@ -38,7 +39,7 @@ impl App {
             branches.insert(branch.to_string());
         }
         App {
-            repo: Repository::new(repo_dir),
+            repo: Repository::new(&PathBuf::from(repo_dir)),
             protected_branches: branches,
             ui: ui,
         }
