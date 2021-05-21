@@ -18,6 +18,7 @@
  */
 use std::env;
 use std::fs::File;
+use std::path::PathBuf;
 use std::process::Command;
 
 // Define this environment variable to print all executed git commands to stderr
@@ -55,13 +56,13 @@ impl Drop for BranchRestorer<'_> {
 }
 
 pub struct Repository {
-    pub dir: String,
+    pub path: PathBuf,
 }
 
 impl Repository {
     pub fn new(dir: &str) -> Repository {
         Repository {
-            dir: dir.to_string(),
+            path: PathBuf::from(dir)
         }
     }
 
@@ -76,14 +77,14 @@ impl Repository {
 
     pub fn git(&self, subcommand: &str, args: &[&str]) -> Result<String, i32> {
         let mut cmd = Command::new("git");
-        cmd.current_dir(&self.dir);
+        cmd.current_dir(&self.path);
         cmd.env("LANG", "C");
         cmd.arg(subcommand);
         for arg in args {
             cmd.arg(arg);
         }
         if env::var(GIT_BONSAI_DEBUG).is_ok() {
-            eprintln!("DEBUG: pwd={}: git {} {}", self.dir, subcommand, args.join(" "));
+            eprintln!("DEBUG: pwd={}: git {} {}", self.path.to_str().unwrap(), subcommand, args.join(" "));
         }
         let output = match cmd.output() {
             Ok(x) => x,

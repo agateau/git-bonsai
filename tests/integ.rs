@@ -55,7 +55,7 @@ mod integ {
     }
 
     fn create_and_commit_file(repo: &Repository, name: &str) {
-        File::create(repo.dir.to_owned() + "/" + name).unwrap();
+        File::create(repo.path.join(name)).unwrap();
         repo.git("add", &[name]).unwrap();
         repo.git("commit", &["-m", &format!("Create file {}", name)])
             .unwrap();
