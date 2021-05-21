@@ -1,3 +1,5 @@
 #!/bin/bash
 set -euo pipefail
+echo "Checking coding style"
 cargo fmt -- --check
+echo "OK"

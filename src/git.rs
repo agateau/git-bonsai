@@ -62,7 +62,7 @@ pub struct Repository {
 impl Repository {
     pub fn new(path: &Path) -> Repository {
         Repository {
-            path: path.to_path_buf()
+            path: path.to_path_buf(),
         }
     }
 
@@ -84,7 +84,12 @@ impl Repository {
             cmd.arg(arg);
         }
         if env::var(GIT_BONSAI_DEBUG).is_ok() {
-            eprintln!("DEBUG: pwd={}: git {} {}", self.path.to_str().unwrap(), subcommand, args.join(" "));
+            eprintln!(
+                "DEBUG: pwd={}: git {} {}",
+                self.path.to_str().unwrap(),
+                subcommand,
+                args.join(" ")
+            );
         }
         let output = match cmd.output() {
             Ok(x) => x,
@@ -258,8 +263,8 @@ pub fn create_test_repository(path: &Path) -> Repository {
 mod tests {
     extern crate assert_fs;
 
-    use std::fs;
     use super::*;
+    use std::fs;
 
     #[test]
     fn get_current_branch() {
@@ -359,7 +364,9 @@ mod tests {
         // with the topic1 branch checked-out in a separate worktree
         let worktree_dir = assert_fs::TempDir::new().unwrap();
         let worktree_path_str = worktree_dir.path().to_str().unwrap();
-        clone_repo.git("worktree", &["add", worktree_path_str, "topic1"]).unwrap();
+        clone_repo
+            .git("worktree", &["add", worktree_path_str, "topic1"])
+            .unwrap();
 
         // WHEN I list branches
         let branches = clone_repo.list_branches().unwrap();
