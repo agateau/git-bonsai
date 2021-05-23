@@ -96,12 +96,7 @@ impl App {
         Ok(())
     }
     pub fn remove_merged_branches(&self) -> Result<(), GitError> {
-        let to_delete = match self.get_deletable_branches() {
-            Ok(x) => x,
-            Err(x) => {
-                return Err(x);
-            }
-        };
+        let to_delete = self.get_deletable_branches()?;
 
         if to_delete.is_empty() {
             println!("No deletable branches");

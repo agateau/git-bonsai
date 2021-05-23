@@ -100,10 +100,8 @@ impl Repository {
     #[allow(dead_code)]
     pub fn clone(path: &Path, url: &str) -> Result<Repository, GitError> {
         let repo = Repository::new(path);
-        match repo.git("clone", &[url, path.to_str().unwrap()]) {
-            Ok(_x) => Ok(repo),
-            Err(x) => Err(x),
-        }
+        repo.git("clone", &[url, path.to_str().unwrap()])?;
+        Ok(repo)
     }
 
     pub fn git(&self, subcommand: &str, args: &[&str]) -> Result<String, GitError> {
@@ -145,10 +143,8 @@ impl Repository {
     }
 
     pub fn fetch(&self) -> Result<(), GitError> {
-        match self.git("fetch", &["--prune"]) {
-            Ok(_x) => Ok(()),
-            Err(x) => Err(x),
-        }
+        self.git("fetch", &["--prune"])?;
+        Ok(())
     }
 
     pub fn list_branches(&self) -> Result<Vec<String>, GitError> {
@@ -157,10 +153,9 @@ impl Repository {
 
     pub fn list_branches_with_sha1s(&self) -> Result<Vec<(String, String)>, GitError> {
         let mut list: Vec<(String, String)> = Vec::new();
-        let lines = match self.list_branches_internal(&["-v"]) {
-            Ok(x) => x,
-            Err(x) => return Err(x),
-        };
+
+        let lines = self.list_branches_internal(&["-v"])?;
+
         for line in lines {
             let mut it = line.split_whitespace();
             let branch = it.next().unwrap().to_string();
@@ -173,10 +168,8 @@ impl Repository {
     fn list_branches_internal(&self, args: &[&str]) -> Result<Vec<String>, GitError> {
         let mut branches: Vec<String> = Vec::new();
 
-        let stdout = match self.git("branch", args) {
-            Ok(x) => x,
-            Err(x) => return Err(x),
-        };
+        let stdout = self.git("branch", args)?;
+
         for line in stdout.lines() {
             if line.starts_with(WORKTREE_BRANCH_PREFIX) {
                 continue;
@@ -184,7 +177,6 @@ impl Repository {
             let branch = line.get(2..).expect("Invalid branch name");
             branches.push(branch.to_string());
         }
-
         Ok(branches)
     }
 
@@ -194,10 +186,9 @@ impl Repository {
 
     pub fn list_tracking_branches(&self) -> Result<Vec<String>, GitError> {
         let mut branches: Vec<String> = Vec::new();
-        let lines = match self.list_branches_internal(&["-vv"]) {
-            Ok(x) => x,
-            Err(x) => return Err(x),
-        };
+
+        let lines = self.list_branches_internal(&["-vv"])?;
+
         for line in lines {
             if line.contains("[origin/") && !line.contains(": gone]") {
                 let branch = line.split(' ').next();
@@ -208,10 +199,8 @@ impl Repository {
     }
 
     pub fn checkout(&self, branch: &str) -> Result<(), GitError> {
-        match self.git("checkout", &[branch]) {
-            Ok(_x) => Ok(()),
-            Err(x) => Err(x),
-        }
+        self.git("checkout", &[branch])?;
+        Ok(())
     }
 
     pub fn safe_delete_branch(&self, branch: &str) -> Result<(), GitError> {
@@ -221,10 +210,8 @@ impl Repository {
             println!("Not deleting {}, no other branches contain it", branch);
             return Err(GitError::new_unsafe_delete());
         }
-        match self.git("branch", &["-D", branch]) {
-            Ok(_x) => Ok(()),
-            Err(x) => Err(x),
-        }
+        self.git("branch", &["-D", branch])?;
+        Ok(())
     }
 
     pub fn get_current_branch(&self) -> Option<String> {
@@ -241,31 +228,21 @@ impl Repository {
     }
 
     pub fn update_branch(&self) -> Result<(), GitError> {
-        match self.git("merge", &["--ff-only"]) {
-            Ok(out) => {
-                println!("{}", out);
-                Ok(())
-            }
-            Err(x) => Err(x),
-        }
+        let out = self.git("merge", &["--ff-only"])?;
+        println!("{}", out);
+        Ok(())
     }
 
     pub fn has_changes(&self) -> Result<bool, GitError> {
-        match self.git("status", &["--short"]) {
-            Ok(out) => Ok(!out.is_empty()),
-            Err(x) => Err(x),
-        }
+        let out = self.git("status", &["--short"])?;
+        Ok(!out.is_empty())
     }
 
     #[allow(dead_code)]
     pub fn get_current_sha1(&self) -> Result<String, GitError> {
-        match self.git("show", &["--no-patch", "--oneline"]) {
-            Ok(out) => {
-                let sha1 = out.split(' ').next().unwrap();
-                Ok(sha1.to_string())
-            }
-            Err(x) => Err(x),
-        }
+        let out = self.git("show", &["--no-patch", "--oneline"])?;
+        let sha1 = out.split(' ').next().unwrap().to_string();
+        Ok(sha1)
     }
 }
 
