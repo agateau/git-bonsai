@@ -17,6 +17,7 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 use std::env;
+use std::fmt;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -27,6 +28,24 @@ const GIT_BONSAI_DEBUG: &str = "GB_DEBUG";
 // If a branch is checked out in a separate worktree, then `git branch` prefixes it with this
 // string
 const WORKTREE_BRANCH_PREFIX: &str = "+ ";
+
+pub struct GitError {
+    exit_code: i32,
+}
+
+impl GitError {
+    pub fn new(exit_code: i32) -> GitError {
+        GitError {
+            exit_code
+        }
+    }
+}
+
+impl fmt::Display for GitError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Command exited with code {}", self.exit_code)
+    }
+}
 
 /**
  * Restores the current git branch when dropped
@@ -112,10 +131,10 @@ impl Repository {
         Ok(out)
     }
 
-    pub fn fetch(&self) -> Result<(), i32> {
+    pub fn fetch(&self) -> Result<(), GitError> {
         match self.git("fetch", &["--prune"]) {
             Ok(_x) => Ok(()),
-            Err(x) => Err(x),
+            Err(x) => Err(GitError::new(x)),
         }
     }
 

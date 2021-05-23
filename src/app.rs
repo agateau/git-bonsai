@@ -22,7 +22,7 @@ use std::path::PathBuf;
 use crate::appui::{AppUi, BranchToDeleteInfo};
 use crate::batchappui::BatchAppUi;
 use crate::cliargs::CliArgs;
-use crate::git::{BranchRestorer, Repository};
+use crate::git::{BranchRestorer, GitError, Repository};
 use crate::interactiveappui::InteractiveAppUi;
 
 pub struct App {
@@ -66,7 +66,7 @@ impl App {
         }
     }
 
-    pub fn fetch_changes(&self) -> Result<(), i32> {
+    pub fn fetch_changes(&self) -> Result<(), GitError> {
         self.ui.log_info("Fetching changes");
         self.repo.fetch()
     }
@@ -294,7 +294,8 @@ pub fn run(args: CliArgs, dir: &str) -> i32 {
 
     if !args.no_fetch {
         if let Err(x) = app.fetch_changes() {
-            return x;
+            eprintln!("Fetching changes failed: {}", x);
+            return 2;
         }
     }
 
