@@ -29,15 +29,27 @@ const GIT_BONSAI_DEBUG: &str = "GB_DEBUG";
 // string
 const WORKTREE_BRANCH_PREFIX: &str = "+ ";
 
+#[derive(Debug, PartialEq)]
 pub struct GitError {
-    exit_code: i32,
+    pub exit_code: i32,
 }
 
 impl GitError {
     pub fn new(exit_code: i32) -> GitError {
-        GitError {
-            exit_code
-        }
+        GitError { exit_code }
+    }
+
+    // TODO: this is probably not the Rust way to do things
+    pub fn new_unsafe_delete() -> GitError {
+        GitError::new(-1)
+    }
+
+    pub fn new_failed_to_execute() -> GitError {
+        GitError::new(-2)
+    }
+
+    pub fn new_terminated_by_signal() -> GitError {
+        GitError::new(-3)
     }
 }
 
@@ -86,7 +98,7 @@ impl Repository {
     }
 
     #[allow(dead_code)]
-    pub fn clone(path: &Path, url: &str) -> Result<Repository, i32> {
+    pub fn clone(path: &Path, url: &str) -> Result<Repository, GitError> {
         let repo = Repository::new(path);
         match repo.git("clone", &[url, path.to_str().unwrap()]) {
             Ok(_x) => Ok(repo),
@@ -94,7 +106,7 @@ impl Repository {
         }
     }
 
-    pub fn git(&self, subcommand: &str, args: &[&str]) -> Result<String, i32> {
+    pub fn git(&self, subcommand: &str, args: &[&str]) -> Result<String, GitError> {
         let mut cmd = Command::new("git");
         cmd.current_dir(&self.path);
         cmd.env("LANG", "C");
@@ -114,17 +126,18 @@ impl Repository {
             Ok(x) => x,
             Err(_x) => {
                 println!("Failed to execute process");
-                return Err(-1);
+                return Err(GitError::new_failed_to_execute());
             }
         };
         if !output.status.success() {
+            // TODO: store error message in GitError
             println!(
                 "{}",
                 String::from_utf8(output.stderr).expect("Failed to decode command stderr")
             );
             return match output.status.code() {
-                Some(code) => Err(code),
-                None => Err(-1),
+                Some(code) => Err(GitError::new(code)),
+                None => Err(GitError::new_terminated_by_signal()),
             };
         }
         let out = String::from_utf8(output.stdout).expect("Failed to decode command stdout");
@@ -134,15 +147,15 @@ impl Repository {
     pub fn fetch(&self) -> Result<(), GitError> {
         match self.git("fetch", &["--prune"]) {
             Ok(_x) => Ok(()),
-            Err(x) => Err(GitError::new(x)),
+            Err(x) => Err(x),
         }
     }
 
-    pub fn list_branches(&self) -> Result<Vec<String>, i32> {
+    pub fn list_branches(&self) -> Result<Vec<String>, GitError> {
         self.list_branches_internal(&[])
     }
 
-    pub fn list_branches_with_sha1s(&self) -> Result<Vec<(String, String)>, i32> {
+    pub fn list_branches_with_sha1s(&self) -> Result<Vec<(String, String)>, GitError> {
         let mut list: Vec<(String, String)> = Vec::new();
         let lines = match self.list_branches_internal(&["-v"]) {
             Ok(x) => x,
@@ -157,7 +170,7 @@ impl Repository {
         Ok(list)
     }
 
-    fn list_branches_internal(&self, args: &[&str]) -> Result<Vec<String>, i32> {
+    fn list_branches_internal(&self, args: &[&str]) -> Result<Vec<String>, GitError> {
         let mut branches: Vec<String> = Vec::new();
 
         let stdout = match self.git("branch", args) {
@@ -175,11 +188,11 @@ impl Repository {
         Ok(branches)
     }
 
-    pub fn list_branches_containing(&self, commit: &str) -> Result<Vec<String>, i32> {
+    pub fn list_branches_containing(&self, commit: &str) -> Result<Vec<String>, GitError> {
         self.list_branches_internal(&["--contains", commit])
     }
 
-    pub fn list_tracking_branches(&self) -> Result<Vec<String>, i32> {
+    pub fn list_tracking_branches(&self) -> Result<Vec<String>, GitError> {
         let mut branches: Vec<String> = Vec::new();
         let lines = match self.list_branches_internal(&["-vv"]) {
             Ok(x) => x,
@@ -194,20 +207,19 @@ impl Repository {
         Ok(branches)
     }
 
-    pub fn checkout(&self, branch: &str) -> Result<(), i32> {
+    pub fn checkout(&self, branch: &str) -> Result<(), GitError> {
         match self.git("checkout", &[branch]) {
             Ok(_x) => Ok(()),
             Err(x) => Err(x),
         }
     }
 
-    pub fn safe_delete_branch(&self, branch: &str) -> Result<(), i32> {
+    pub fn safe_delete_branch(&self, branch: &str) -> Result<(), GitError> {
         // A branch is only safe to delete if at least another branch contains it
         let contained_in = self.list_branches_containing(branch).unwrap();
         if contained_in.len() < 2 {
             println!("Not deleting {}, no other branches contain it", branch);
-            // TODO: switch to real errors
-            return Err(1);
+            return Err(GitError::new_unsafe_delete());
         }
         match self.git("branch", &["-D", branch]) {
             Ok(_x) => Ok(()),
@@ -228,7 +240,7 @@ impl Repository {
         None
     }
 
-    pub fn update_branch(&self) -> Result<(), i32> {
+    pub fn update_branch(&self) -> Result<(), GitError> {
         match self.git("merge", &["--ff-only"]) {
             Ok(out) => {
                 println!("{}", out);
@@ -238,7 +250,7 @@ impl Repository {
         }
     }
 
-    pub fn has_changes(&self) -> Result<bool, i32> {
+    pub fn has_changes(&self) -> Result<bool, GitError> {
         match self.git("status", &["--short"]) {
             Ok(out) => Ok(!out.is_empty()),
             Err(x) => Err(x),
@@ -246,7 +258,7 @@ impl Repository {
     }
 
     #[allow(dead_code)]
-    pub fn get_current_sha1(&self) -> Result<String, i32> {
+    pub fn get_current_sha1(&self) -> Result<String, GitError> {
         match self.git("show", &["--no-patch", "--oneline"]) {
             Ok(out) => {
                 let sha1 = out.split(' ').next().unwrap();
@@ -332,7 +344,7 @@ mod tests {
         let result = repo.safe_delete_branch("test");
 
         // THEN it fails
-        assert_eq!(result, Err(1));
+        assert_eq!(result, Err(GitError::new_unsafe_delete()));
 
         // AND the test branch still exists
         assert_eq!(repo.list_branches().unwrap(), &["master", "test"]);

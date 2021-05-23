@@ -71,7 +71,7 @@ impl App {
         self.repo.fetch()
     }
 
-    pub fn update_tracking_branches(&self) -> Result<(), i32> {
+    pub fn update_tracking_branches(&self) -> Result<(), GitError> {
         let branches = match self.repo.list_tracking_branches() {
             Ok(x) => x,
             Err(x) => {
@@ -95,7 +95,7 @@ impl App {
         }
         Ok(())
     }
-    pub fn remove_merged_branches(&self) -> Result<(), i32> {
+    pub fn remove_merged_branches(&self) -> Result<(), GitError> {
         let to_delete = match self.get_deletable_branches() {
             Ok(x) => x,
             Err(x) => {
@@ -154,7 +154,7 @@ impl App {
         }
     }
 
-    fn get_deletable_branches(&self) -> Result<Vec<BranchToDeleteInfo>, i32> {
+    fn get_deletable_branches(&self) -> Result<Vec<BranchToDeleteInfo>, GitError> {
         let deletable_branches: Vec<BranchToDeleteInfo> = match self.repo.list_branches() {
             Ok(x) => x,
             Err(x) => {
@@ -193,7 +193,7 @@ impl App {
         &self,
         sha1: &str,
         branches: &HashSet<String>,
-    ) -> Result<bool, i32> {
+    ) -> Result<bool, GitError> {
         for branch in self.repo.list_branches_containing(sha1).unwrap() {
             if !branches.contains(&branch) {
                 return Ok(true);
@@ -206,7 +206,7 @@ impl App {
         &self,
         sha1: &str,
         branch_set: &HashSet<String>,
-    ) -> Result<(), i32> {
+    ) -> Result<(), GitError> {
         let unprotected_branch_set: HashSet<_> =
             branch_set.difference(&self.protected_branches).collect();
         if !self
@@ -247,7 +247,7 @@ impl App {
         Ok(())
     }
 
-    pub fn delete_identical_branches(&self) -> Result<(), i32> {
+    pub fn delete_identical_branches(&self) -> Result<(), GitError> {
         // Create a hashmap sha1 => set(branches)
         let mut branches_for_sha1: HashMap<String, HashSet<String>> = HashMap::new();
 
@@ -300,15 +300,15 @@ pub fn run(args: CliArgs, dir: &str) -> i32 {
     }
 
     if let Err(x) = app.update_tracking_branches() {
-        return x;
+        return x.exit_code;
     }
 
     if let Err(x) = app.delete_identical_branches() {
-        return x;
+        return x.exit_code;
     }
 
     if let Err(x) = app.remove_merged_branches() {
-        return x;
+        return x.exit_code;
     }
     0
 }
