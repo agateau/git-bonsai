@@ -30,32 +30,29 @@ const GIT_BONSAI_DEBUG: &str = "GB_DEBUG";
 const WORKTREE_BRANCH_PREFIX: &str = "+ ";
 
 #[derive(Debug, PartialEq)]
-pub struct GitError {
-    pub exit_code: i32,
-}
-
-impl GitError {
-    pub fn new(exit_code: i32) -> GitError {
-        GitError { exit_code }
-    }
-
-    // TODO: this is probably not the Rust way to do things
-    pub fn new_unsafe_delete() -> GitError {
-        GitError::new(-1)
-    }
-
-    pub fn new_failed_to_execute() -> GitError {
-        GitError::new(-2)
-    }
-
-    pub fn new_terminated_by_signal() -> GitError {
-        GitError::new(-3)
-    }
+pub enum GitError {
+    FailedToRunGit,
+    CommandFailed { exit_code: i32 },
+    TerminatedBySignal,
+    UnsafeDelete,
 }
 
 impl fmt::Display for GitError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Command exited with code {}", self.exit_code)
+        match self {
+            GitError::FailedToRunGit => {
+                write!(f, "Failed to run git")
+            }
+            GitError::CommandFailed { exit_code: e } => {
+                write!(f, "Command exited with code {}", e)
+            }
+            GitError::TerminatedBySignal => {
+                write!(f, "Terminated by signal")
+            }
+            GitError::UnsafeDelete => {
+                write!(f, "Unsafe delete")
+            }
+        }
     }
 }
 
@@ -124,7 +121,7 @@ impl Repository {
             Ok(x) => x,
             Err(_x) => {
                 println!("Failed to execute process");
-                return Err(GitError::new_failed_to_execute());
+                return Err(GitError::FailedToRunGit);
             }
         };
         if !output.status.success() {
@@ -134,8 +131,8 @@ impl Repository {
                 String::from_utf8(output.stderr).expect("Failed to decode command stderr")
             );
             return match output.status.code() {
-                Some(code) => Err(GitError::new(code)),
-                None => Err(GitError::new_terminated_by_signal()),
+                Some(code) => Err(GitError::CommandFailed { exit_code: code }),
+                None => Err(GitError::TerminatedBySignal),
             };
         }
         let out = String::from_utf8(output.stdout).expect("Failed to decode command stdout");
@@ -208,7 +205,7 @@ impl Repository {
         let contained_in = self.list_branches_containing(branch).unwrap();
         if contained_in.len() < 2 {
             println!("Not deleting {}, no other branches contain it", branch);
-            return Err(GitError::new_unsafe_delete());
+            return Err(GitError::UnsafeDelete);
         }
         self.git("branch", &["-D", branch])?;
         Ok(())
@@ -321,7 +318,7 @@ mod tests {
         let result = repo.safe_delete_branch("test");
 
         // THEN it fails
-        assert_eq!(result, Err(GitError::new_unsafe_delete()));
+        assert_eq!(result, Err(GitError::UnsafeDelete));
 
         // AND the test branch still exists
         assert_eq!(repo.list_branches().unwrap(), &["master", "test"]);

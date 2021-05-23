@@ -294,16 +294,16 @@ pub fn run(args: CliArgs, dir: &str) -> i32 {
         }
     }
 
-    if let Err(x) = app.update_tracking_branches() {
-        return x.exit_code;
+    if let Err(_) = app.update_tracking_branches() {
+        return 3;
     }
 
-    if let Err(x) = app.delete_identical_branches() {
-        return x.exit_code;
+    if let Err(_) = app.delete_identical_branches() {
+        return 4;
     }
 
-    if let Err(x) = app.remove_merged_branches() {
-        return x.exit_code;
+    if let Err(_) = app.remove_merged_branches() {
+        return 5;
     }
     0
 }
