@@ -127,7 +127,7 @@ impl App {
         let to_delete = self.get_deletable_branches()?;
 
         if to_delete.is_empty() {
-            println!("No deletable branches");
+            self.ui.log_info("No deletable branches");
             return Ok(());
         }
 
@@ -307,7 +307,10 @@ impl App {
         // A branch is only safe to delete if at least another branch contains it
         let contained_in = self.repo.list_branches_containing(branch).unwrap();
         if contained_in.len() < 2 {
-            println!("Not deleting {}, no other branches contain it", branch);
+            self.ui.log_error(&format!(
+                "Not deleting {}, no other branches contain it",
+                branch
+            ));
             return Err(AppError::UnsafeDelete);
         }
         self.repo.delete_branch(branch)?;
