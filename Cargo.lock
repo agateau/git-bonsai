@@ -209,7 +209,7 @@ dependencies = [
 
 [[package]]
 name = "git-bonsai"
-version = "0.2.1-alpha"
+version = "0.2.1"
 dependencies = [
  "assert_fs",
  "claim",

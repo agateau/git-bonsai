@@ -1,7 +1,8 @@
 - [ ] Check working tree is up to date and clean:
 
     git checkout dev
-    git bonsai
+    git pull
+    git merge origin/master
 
 - [ ] Bump version number in Cargo.toml
 
