@@ -54,6 +54,7 @@ pub struct App {
     repo: Repository,
     protected_branches: HashSet<String>,
     ui: Box<dyn AppUi>,
+    fetch: bool,
 }
 
 impl App {
@@ -67,6 +68,7 @@ impl App {
             repo: Repository::new(&PathBuf::from(repo_dir)),
             protected_branches: branches,
             ui,
+            fetch: !args.no_fetch,
         }
     }
 
@@ -311,6 +313,17 @@ impl App {
         self.repo.delete_branch(branch)?;
         Ok(())
     }
+
+    pub fn run(&self) -> Result<(), AppError> {
+        if self.fetch {
+            self.fetch_changes()?;
+        }
+
+        self.update_tracking_branches()?;
+        self.delete_identical_branches()?;
+        self.remove_merged_branches()?;
+        Ok(())
+    }
 }
 
 pub fn run(args: CliArgs, dir: &str) -> i32 {
@@ -324,23 +337,8 @@ pub fn run(args: CliArgs, dir: &str) -> i32 {
         return 1;
     }
 
-    if !args.no_fetch {
-        if let Err(x) = app.fetch_changes() {
-            eprintln!("Fetching changes failed: {}", x);
-            return 2;
-        }
+    match app.run() {
+        Ok(()) => 0,
+        Err(_) => 1,
     }
-
-    if let Err(_) = app.update_tracking_branches() {
-        return 3;
-    }
-
-    if let Err(_) = app.delete_identical_branches() {
-        return 4;
-    }
-
-    if let Err(_) = app.remove_merged_branches() {
-        return 5;
-    }
-    0
 }
