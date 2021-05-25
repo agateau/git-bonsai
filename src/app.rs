@@ -17,6 +17,8 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 use std::collections::{HashMap, HashSet};
+use std::convert::From;
+use std::fmt;
 use std::path::PathBuf;
 
 use crate::appui::{AppUi, BranchToDeleteInfo};
@@ -24,6 +26,29 @@ use crate::batchappui::BatchAppUi;
 use crate::cliargs::CliArgs;
 use crate::git::{BranchRestorer, GitError, Repository};
 use crate::interactiveappui::InteractiveAppUi;
+
+#[derive(Debug, PartialEq)]
+pub enum AppError {
+    Git(GitError),
+    UnsafeDelete,
+}
+
+impl From<GitError> for AppError {
+    fn from(error: GitError) -> Self {
+        AppError::Git(error)
+    }
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AppError::Git(error) => error.fmt(f),
+            AppError::UnsafeDelete => {
+                write!(f, "This branch cannot be deleted safely")
+            }
+        }
+    }
+}
 
 pub struct App {
     repo: Repository,
@@ -143,7 +168,7 @@ impl App {
 
             self.ui.log_info(&format!("Deleting {}", branch));
 
-            if self.repo.safe_delete_branch(&branch).is_err() {
+            if self.safe_delete_branch(&branch).is_err() {
                 self.ui.log_warning("Failed to delete branch");
             }
         }
@@ -272,6 +297,17 @@ impl App {
             }
         }
 
+        Ok(())
+    }
+
+    pub fn safe_delete_branch(&self, branch: &str) -> Result<(), AppError> {
+        // A branch is only safe to delete if at least another branch contains it
+        let contained_in = self.repo.list_branches_containing(branch).unwrap();
+        if contained_in.len() < 2 {
+            println!("Not deleting {}, no other branches contain it", branch);
+            return Err(AppError::UnsafeDelete);
+        }
+        self.repo.delete_branch(branch)?;
         Ok(())
     }
 }

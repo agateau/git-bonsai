@@ -34,7 +34,6 @@ pub enum GitError {
     FailedToRunGit,
     CommandFailed { exit_code: i32 },
     TerminatedBySignal,
-    UnsafeDelete,
 }
 
 impl fmt::Display for GitError {
@@ -48,9 +47,6 @@ impl fmt::Display for GitError {
             }
             GitError::TerminatedBySignal => {
                 write!(f, "Terminated by signal")
-            }
-            GitError::UnsafeDelete => {
-                write!(f, "Unsafe delete")
             }
         }
     }
@@ -200,13 +196,7 @@ impl Repository {
         Ok(())
     }
 
-    pub fn safe_delete_branch(&self, branch: &str) -> Result<(), GitError> {
-        // A branch is only safe to delete if at least another branch contains it
-        let contained_in = self.list_branches_containing(branch).unwrap();
-        if contained_in.len() < 2 {
-            println!("Not deleting {}, no other branches contain it", branch);
-            return Err(GitError::UnsafeDelete);
-        }
+    pub fn delete_branch(&self, branch: &str) -> Result<(), GitError> {
         self.git("branch", &["-D", branch])?;
         Ok(())
     }
@@ -281,26 +271,7 @@ mod tests {
     }
 
     #[test]
-    fn safe_delete_branch() {
-        // GIVEN a repository with a test branch equals to master
-        let dir = assert_fs::TempDir::new().unwrap();
-        let repo = create_test_repository(dir.path());
-        assert_eq!(repo.get_current_branch().unwrap(), "master");
-
-        repo.git("branch", &["test"]).unwrap();
-
-        // WHEN I call safe_delete_branch
-        let result = repo.safe_delete_branch("test");
-
-        // THEN it succeeds
-        assert_eq!(result, Ok(()));
-
-        // AND only the master branch remains
-        assert_eq!(repo.list_branches().unwrap(), &["master"]);
-    }
-
-    #[test]
-    fn cant_delete_unique_branch() {
+    fn delete_branch() {
         // GIVEN a repository with a test branch containing unique content
         let dir = assert_fs::TempDir::new().unwrap();
         let repo = create_test_repository(dir.path());
@@ -314,14 +285,14 @@ mod tests {
 
         repo.checkout("master").unwrap();
 
-        // WHEN I call safe_delete_branch
-        let result = repo.safe_delete_branch("test");
+        // WHEN I call delete_branch
+        let result = repo.delete_branch("test");
 
-        // THEN it fails
-        assert_eq!(result, Err(GitError::UnsafeDelete));
+        // THEN the branch is deleted
+        assert_eq!(result, Ok(()));
 
-        // AND the test branch still exists
-        assert_eq!(repo.list_branches().unwrap(), &["master", "test"]);
+        // AND only the master branch remains
+        assert_eq!(repo.list_branches().unwrap(), &["master"]);
     }
 
     #[test]
