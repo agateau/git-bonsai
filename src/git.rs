@@ -17,6 +17,7 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 use std::env;
+use std::fmt;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -27,6 +28,29 @@ const GIT_BONSAI_DEBUG: &str = "GB_DEBUG";
 // If a branch is checked out in a separate worktree, then `git branch` prefixes it with this
 // string
 const WORKTREE_BRANCH_PREFIX: &str = "+ ";
+
+#[derive(Debug, PartialEq)]
+pub enum GitError {
+    FailedToRunGit,
+    CommandFailed { exit_code: i32 },
+    TerminatedBySignal,
+}
+
+impl fmt::Display for GitError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GitError::FailedToRunGit => {
+                write!(f, "Failed to run git")
+            }
+            GitError::CommandFailed { exit_code: e } => {
+                write!(f, "Command exited with code {}", e)
+            }
+            GitError::TerminatedBySignal => {
+                write!(f, "Terminated by signal")
+            }
+        }
+    }
+}
 
 /**
  * Restores the current git branch when dropped
@@ -67,15 +91,13 @@ impl Repository {
     }
 
     #[allow(dead_code)]
-    pub fn clone(path: &Path, url: &str) -> Result<Repository, i32> {
+    pub fn clone(path: &Path, url: &str) -> Result<Repository, GitError> {
         let repo = Repository::new(path);
-        match repo.git("clone", &[url, path.to_str().unwrap()]) {
-            Ok(_x) => Ok(repo),
-            Err(x) => Err(x),
-        }
+        repo.git("clone", &[url, path.to_str().unwrap()])?;
+        Ok(repo)
     }
 
-    pub fn git(&self, subcommand: &str, args: &[&str]) -> Result<String, i32> {
+    pub fn git(&self, subcommand: &str, args: &[&str]) -> Result<String, GitError> {
         let mut cmd = Command::new("git");
         cmd.current_dir(&self.path);
         cmd.env("LANG", "C");
@@ -95,40 +117,38 @@ impl Repository {
             Ok(x) => x,
             Err(_x) => {
                 println!("Failed to execute process");
-                return Err(-1);
+                return Err(GitError::FailedToRunGit);
             }
         };
         if !output.status.success() {
+            // TODO: store error message in GitError
             println!(
                 "{}",
                 String::from_utf8(output.stderr).expect("Failed to decode command stderr")
             );
             return match output.status.code() {
-                Some(code) => Err(code),
-                None => Err(-1),
+                Some(code) => Err(GitError::CommandFailed { exit_code: code }),
+                None => Err(GitError::TerminatedBySignal),
             };
         }
         let out = String::from_utf8(output.stdout).expect("Failed to decode command stdout");
         Ok(out)
     }
 
-    pub fn fetch(&self) -> Result<(), i32> {
-        match self.git("fetch", &["--prune"]) {
-            Ok(_x) => Ok(()),
-            Err(x) => Err(x),
-        }
+    pub fn fetch(&self) -> Result<(), GitError> {
+        self.git("fetch", &["--prune"])?;
+        Ok(())
     }
 
-    pub fn list_branches(&self) -> Result<Vec<String>, i32> {
+    pub fn list_branches(&self) -> Result<Vec<String>, GitError> {
         self.list_branches_internal(&[])
     }
 
-    pub fn list_branches_with_sha1s(&self) -> Result<Vec<(String, String)>, i32> {
+    pub fn list_branches_with_sha1s(&self) -> Result<Vec<(String, String)>, GitError> {
         let mut list: Vec<(String, String)> = Vec::new();
-        let lines = match self.list_branches_internal(&["-v"]) {
-            Ok(x) => x,
-            Err(x) => return Err(x),
-        };
+
+        let lines = self.list_branches_internal(&["-v"])?;
+
         for line in lines {
             let mut it = line.split_whitespace();
             let branch = it.next().unwrap().to_string();
@@ -138,13 +158,11 @@ impl Repository {
         Ok(list)
     }
 
-    fn list_branches_internal(&self, args: &[&str]) -> Result<Vec<String>, i32> {
+    fn list_branches_internal(&self, args: &[&str]) -> Result<Vec<String>, GitError> {
         let mut branches: Vec<String> = Vec::new();
 
-        let stdout = match self.git("branch", args) {
-            Ok(x) => x,
-            Err(x) => return Err(x),
-        };
+        let stdout = self.git("branch", args)?;
+
         for line in stdout.lines() {
             if line.starts_with(WORKTREE_BRANCH_PREFIX) {
                 continue;
@@ -152,20 +170,18 @@ impl Repository {
             let branch = line.get(2..).expect("Invalid branch name");
             branches.push(branch.to_string());
         }
-
         Ok(branches)
     }
 
-    pub fn list_branches_containing(&self, commit: &str) -> Result<Vec<String>, i32> {
+    pub fn list_branches_containing(&self, commit: &str) -> Result<Vec<String>, GitError> {
         self.list_branches_internal(&["--contains", commit])
     }
 
-    pub fn list_tracking_branches(&self) -> Result<Vec<String>, i32> {
+    pub fn list_tracking_branches(&self) -> Result<Vec<String>, GitError> {
         let mut branches: Vec<String> = Vec::new();
-        let lines = match self.list_branches_internal(&["-vv"]) {
-            Ok(x) => x,
-            Err(x) => return Err(x),
-        };
+
+        let lines = self.list_branches_internal(&["-vv"])?;
+
         for line in lines {
             if line.contains("[origin/") && !line.contains(": gone]") {
                 let branch = line.split(' ').next();
@@ -175,25 +191,14 @@ impl Repository {
         Ok(branches)
     }
 
-    pub fn checkout(&self, branch: &str) -> Result<(), i32> {
-        match self.git("checkout", &[branch]) {
-            Ok(_x) => Ok(()),
-            Err(x) => Err(x),
-        }
+    pub fn checkout(&self, branch: &str) -> Result<(), GitError> {
+        self.git("checkout", &[branch])?;
+        Ok(())
     }
 
-    pub fn safe_delete_branch(&self, branch: &str) -> Result<(), i32> {
-        // A branch is only safe to delete if at least another branch contains it
-        let contained_in = self.list_branches_containing(branch).unwrap();
-        if contained_in.len() < 2 {
-            println!("Not deleting {}, no other branches contain it", branch);
-            // TODO: switch to real errors
-            return Err(1);
-        }
-        match self.git("branch", &["-D", branch]) {
-            Ok(_x) => Ok(()),
-            Err(x) => Err(x),
-        }
+    pub fn delete_branch(&self, branch: &str) -> Result<(), GitError> {
+        self.git("branch", &["-D", branch])?;
+        Ok(())
     }
 
     pub fn get_current_branch(&self) -> Option<String> {
@@ -209,32 +214,22 @@ impl Repository {
         None
     }
 
-    pub fn update_branch(&self) -> Result<(), i32> {
-        match self.git("merge", &["--ff-only"]) {
-            Ok(out) => {
-                println!("{}", out);
-                Ok(())
-            }
-            Err(x) => Err(x),
-        }
+    pub fn update_branch(&self) -> Result<(), GitError> {
+        let out = self.git("merge", &["--ff-only"])?;
+        println!("{}", out);
+        Ok(())
     }
 
-    pub fn has_changes(&self) -> Result<bool, i32> {
-        match self.git("status", &["--short"]) {
-            Ok(out) => Ok(!out.is_empty()),
-            Err(x) => Err(x),
-        }
+    pub fn has_changes(&self) -> Result<bool, GitError> {
+        let out = self.git("status", &["--short"])?;
+        Ok(!out.is_empty())
     }
 
     #[allow(dead_code)]
-    pub fn get_current_sha1(&self) -> Result<String, i32> {
-        match self.git("show", &["--no-patch", "--oneline"]) {
-            Ok(out) => {
-                let sha1 = out.split(' ').next().unwrap();
-                Ok(sha1.to_string())
-            }
-            Err(x) => Err(x),
-        }
+    pub fn get_current_sha1(&self) -> Result<String, GitError> {
+        let out = self.git("show", &["--no-patch", "--oneline"])?;
+        let sha1 = out.split(' ').next().unwrap().to_string();
+        Ok(sha1)
     }
 }
 
@@ -276,26 +271,7 @@ mod tests {
     }
 
     #[test]
-    fn safe_delete_branch() {
-        // GIVEN a repository with a test branch equals to master
-        let dir = assert_fs::TempDir::new().unwrap();
-        let repo = create_test_repository(dir.path());
-        assert_eq!(repo.get_current_branch().unwrap(), "master");
-
-        repo.git("branch", &["test"]).unwrap();
-
-        // WHEN I call safe_delete_branch
-        let result = repo.safe_delete_branch("test");
-
-        // THEN it succeeds
-        assert_eq!(result, Ok(()));
-
-        // AND only the master branch remains
-        assert_eq!(repo.list_branches().unwrap(), &["master"]);
-    }
-
-    #[test]
-    fn cant_delete_unique_branch() {
+    fn delete_branch() {
         // GIVEN a repository with a test branch containing unique content
         let dir = assert_fs::TempDir::new().unwrap();
         let repo = create_test_repository(dir.path());
@@ -309,14 +285,14 @@ mod tests {
 
         repo.checkout("master").unwrap();
 
-        // WHEN I call safe_delete_branch
-        let result = repo.safe_delete_branch("test");
+        // WHEN I call delete_branch
+        let result = repo.delete_branch("test");
 
-        // THEN it fails
-        assert_eq!(result, Err(1));
+        // THEN the branch is deleted
+        assert_eq!(result, Ok(()));
 
-        // AND the test branch still exists
-        assert_eq!(repo.list_branches().unwrap(), &["master", "test"]);
+        // AND only the master branch remains
+        assert_eq!(repo.list_branches().unwrap(), &["master"]);
     }
 
     #[test]

@@ -29,7 +29,7 @@ mod integ {
     use claim::*;
     use predicates::prelude::*;
 
-    use git_bonsai::app::{self, App};
+    use git_bonsai::app::{self, App, AppError};
     use git_bonsai::batchappui::BatchAppUi;
     use git_bonsai::cliargs::CliArgs;
     use git_bonsai::git::create_test_repository;
@@ -232,5 +232,41 @@ mod integ {
         // THEN it does not fail
         let app = create_app(&clone_path_str, &[]);
         assert_ok!(app.update_tracking_branches());
+    }
+
+    #[test]
+    fn safe_delete_branch() {
+        // GIVEN a repository with a test branch equals to master
+        let (dir, repo) = create_repository();
+        repo.git("branch", &["test"]).unwrap();
+        repo.checkout("master").unwrap();
+
+        // WHEN I call safe_delete_branch
+        let app = create_app(&dir.path().to_str().unwrap(), &[]);
+        let result = app.safe_delete_branch("test");
+
+        // THEN it succeeds
+        assert_eq!(result, Ok(()));
+
+        // AND only the master branch remains
+        assert_eq!(repo.list_branches().unwrap(), &["master"]);
+    }
+
+    #[test]
+    fn cant_delete_unique_branch() {
+        // GIVEN a repository with a test branch containing unique content
+        let (dir, repo) = create_repository();
+        create_branch(&repo, "test");
+        repo.checkout("master").unwrap();
+
+        // WHEN I call safe_delete_branch
+        let app = create_app(&dir.path().to_str().unwrap(), &[]);
+        let result = app.safe_delete_branch("test");
+
+        // THEN it fails
+        assert_eq!(result, Err(AppError::UnsafeDelete));
+
+        // AND the test branch still exists
+        assert_eq!(repo.list_branches().unwrap(), &["master", "test"]);
     }
 }
