@@ -29,7 +29,7 @@ mod integ {
     use claim::*;
     use predicates::prelude::*;
 
-    use git_bonsai::app::{self, App};
+    use git_bonsai::app::{self, App, AppError};
     use git_bonsai::batchappui::BatchAppUi;
     use git_bonsai::cliargs::CliArgs;
     use git_bonsai::git::create_test_repository;
@@ -37,15 +37,13 @@ mod integ {
 
     fn create_repository() -> (assert_fs::TempDir, Repository) {
         let dir = assert_fs::TempDir::new().unwrap();
-        let path_str = dir.path().to_str().unwrap();
-        let repo = create_test_repository(&path_str);
+        let repo = create_test_repository(dir.path());
         (dir, repo)
     }
 
     fn clone_repository(url: &str) -> (assert_fs::TempDir, Repository) {
         let dir = assert_fs::TempDir::new().unwrap();
-        let path_str = dir.path().to_str().unwrap();
-        let repo = Repository::clone(&path_str, &url).unwrap();
+        let repo = Repository::clone(dir.path(), &url).unwrap();
         (dir, repo)
     }
 
@@ -55,7 +53,7 @@ mod integ {
     }
 
     fn create_and_commit_file(repo: &Repository, name: &str) {
-        File::create(repo.dir.to_owned() + "/" + name).unwrap();
+        File::create(repo.path.join(name)).unwrap();
         repo.git("add", &[name]).unwrap();
         repo.git("commit", &["-m", &format!("Create file {}", name)])
             .unwrap();
@@ -85,7 +83,7 @@ mod integ {
         ($repo:expr, $expected_branches:expr) => {
             let branches = $repo.list_branches().unwrap();
             assert_eq!(branches, $expected_branches);
-        }
+        };
     }
 
     #[test]
@@ -207,5 +205,68 @@ mod integ {
 
         // THEN only the master branch remains
         assert_branches_eq!(&repo, &["master"]);
+    }
+
+    #[test]
+    fn skip_worktree_branches() {
+        // GIVEN a source repository with two branches
+        let (source_dir, source_repo) = create_repository();
+        create_branch(&source_repo, "topic1");
+        source_repo.checkout("master").unwrap();
+
+        // AND a clone of this repository
+        let (clone_dir, clone_repo) = clone_repository(source_dir.path().to_str().unwrap());
+        let clone_path_str = clone_dir.path().to_str().unwrap();
+
+        // with the topic1 branch checked-out in a separate worktree
+        let worktree_dir = assert_fs::TempDir::new().unwrap();
+        let worktree_path_str = worktree_dir.path().to_str().unwrap();
+        clone_repo
+            .git("worktree", &["add", worktree_path_str, "topic1"])
+            .unwrap();
+
+        let worktree_repo = Repository::new(worktree_dir.path());
+        worktree_repo.checkout("topic1").unwrap();
+
+        // WHEN git-bonsai updates the branches of the clone
+        // THEN it does not fail
+        let app = create_app(&clone_path_str, &[]);
+        assert_ok!(app.update_tracking_branches());
+    }
+
+    #[test]
+    fn safe_delete_branch() {
+        // GIVEN a repository with a test branch equals to master
+        let (dir, repo) = create_repository();
+        repo.git("branch", &["test"]).unwrap();
+        repo.checkout("master").unwrap();
+
+        // WHEN I call safe_delete_branch
+        let app = create_app(&dir.path().to_str().unwrap(), &[]);
+        let result = app.safe_delete_branch("test");
+
+        // THEN it succeeds
+        assert_eq!(result, Ok(()));
+
+        // AND only the master branch remains
+        assert_eq!(repo.list_branches().unwrap(), &["master"]);
+    }
+
+    #[test]
+    fn cant_delete_unique_branch() {
+        // GIVEN a repository with a test branch containing unique content
+        let (dir, repo) = create_repository();
+        create_branch(&repo, "test");
+        repo.checkout("master").unwrap();
+
+        // WHEN I call safe_delete_branch
+        let app = create_app(&dir.path().to_str().unwrap(), &[]);
+        let result = app.safe_delete_branch("test");
+
+        // THEN it fails
+        assert_eq!(result, Err(AppError::UnsafeDelete));
+
+        // AND the test branch still exists
+        assert_eq!(repo.list_branches().unwrap(), &["master", "test"]);
     }
 }

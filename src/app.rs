@@ -17,17 +17,44 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 use std::collections::{HashMap, HashSet};
+use std::convert::From;
+use std::fmt;
+use std::path::PathBuf;
 
 use crate::appui::{AppUi, BranchToDeleteInfo};
 use crate::batchappui::BatchAppUi;
 use crate::cliargs::CliArgs;
-use crate::git::{BranchRestorer, Repository};
+use crate::git::{BranchRestorer, GitError, Repository};
 use crate::interactiveappui::InteractiveAppUi;
+
+#[derive(Debug, PartialEq)]
+pub enum AppError {
+    Git(GitError),
+    UnsafeDelete,
+}
+
+impl From<GitError> for AppError {
+    fn from(error: GitError) -> Self {
+        AppError::Git(error)
+    }
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AppError::Git(error) => error.fmt(f),
+            AppError::UnsafeDelete => {
+                write!(f, "This branch cannot be deleted safely")
+            }
+        }
+    }
+}
 
 pub struct App {
     repo: Repository,
     protected_branches: HashSet<String>,
     ui: Box<dyn AppUi>,
+    fetch: bool,
 }
 
 impl App {
@@ -38,9 +65,10 @@ impl App {
             branches.insert(branch.to_string());
         }
         App {
-            repo: Repository::new(repo_dir),
+            repo: Repository::new(&PathBuf::from(repo_dir)),
             protected_branches: branches,
-            ui: ui,
+            ui,
+            fetch: !args.no_fetch,
         }
     }
 
@@ -58,24 +86,25 @@ impl App {
                 }
                 true
             }
-            Err(()) => {
+            Err(_) => {
                 self.ui.log_error("Failed to get working tree status");
                 false
             }
         }
     }
 
-    pub fn fetch_changes(&self) -> Result<(), i32> {
+    pub fn fetch_changes(&self) -> Result<(), AppError> {
         self.ui.log_info("Fetching changes");
-        self.repo.fetch()
+        self.repo.fetch()?;
+        Ok(())
     }
 
-    pub fn update_tracking_branches(&self) -> Result<(), i32> {
+    pub fn update_tracking_branches(&self) -> Result<(), AppError> {
         let branches = match self.repo.list_tracking_branches() {
             Ok(x) => x,
             Err(x) => {
                 self.ui.log_error("Failed to list tracking branches");
-                return Err(x);
+                return Err(AppError::Git(x));
             }
         };
 
@@ -84,7 +113,7 @@ impl App {
             self.ui.log_info(&format!("Updating {}", branch));
             if let Err(x) = self.repo.checkout(&branch) {
                 self.ui.log_error("Failed to checkout branch");
-                return Err(x);
+                return Err(AppError::Git(x));
             }
             if let Err(_x) = self.repo.update_branch() {
                 self.ui.log_warning("Failed to update branch");
@@ -94,16 +123,11 @@ impl App {
         }
         Ok(())
     }
-    pub fn remove_merged_branches(&self) -> Result<(), i32> {
-        let to_delete = match self.get_deletable_branches() {
-            Ok(x) => x,
-            Err(x) => {
-                return Err(x);
-            }
-        };
+    pub fn remove_merged_branches(&self) -> Result<(), AppError> {
+        let to_delete = self.get_deletable_branches()?;
 
         if to_delete.is_empty() {
-            println!("No deletable branches");
+            self.ui.log_info("No deletable branches");
             return Ok(());
         }
 
@@ -112,11 +136,11 @@ impl App {
             return Ok(());
         }
 
-        let foo: Vec<String> = selected_branches
+        let branch_names: Vec<String> = selected_branches
             .iter()
             .map(|x| x.name.to_string())
             .collect();
-        self.delete_branches(&foo[..]);
+        self.delete_branches(&branch_names[..]);
         Ok(())
     }
 
@@ -147,18 +171,18 @@ impl App {
 
             self.ui.log_info(&format!("Deleting {}", branch));
 
-            if self.repo.safe_delete_branch(&branch).is_err() {
+            if self.safe_delete_branch(&branch).is_err() {
                 self.ui.log_warning("Failed to delete branch");
             }
         }
     }
 
-    fn get_deletable_branches(&self) -> Result<Vec<BranchToDeleteInfo>, i32> {
+    fn get_deletable_branches(&self) -> Result<Vec<BranchToDeleteInfo>, AppError> {
         let deletable_branches: Vec<BranchToDeleteInfo> = match self.repo.list_branches() {
             Ok(x) => x,
             Err(x) => {
                 self.ui.log_error("Failed to list branches");
-                return Err(x);
+                return Err(AppError::Git(x));
             }
         }
         .iter()
@@ -174,12 +198,12 @@ impl App {
             }
             .iter()
             .filter(|&x| x != branch)
-            .map(|x| x.clone())
+            .cloned()
             .collect();
 
             BranchToDeleteInfo {
                 name: branch.to_string(),
-                contained_in: contained_in,
+                contained_in,
             }
         })
         .filter(|x| !x.contained_in.is_empty())
@@ -192,7 +216,7 @@ impl App {
         &self,
         sha1: &str,
         branches: &HashSet<String>,
-    ) -> Result<bool, i32> {
+    ) -> Result<bool, GitError> {
         for branch in self.repo.list_branches_containing(sha1).unwrap() {
             if !branches.contains(&branch) {
                 return Ok(true);
@@ -205,7 +229,7 @@ impl App {
         &self,
         sha1: &str,
         branch_set: &HashSet<String>,
-    ) -> Result<(), i32> {
+    ) -> Result<(), AppError> {
         let unprotected_branch_set: HashSet<_> =
             branch_set.difference(&self.protected_branches).collect();
         if !self
@@ -246,7 +270,7 @@ impl App {
         Ok(())
     }
 
-    pub fn delete_identical_branches(&self) -> Result<(), i32> {
+    pub fn delete_identical_branches(&self) -> Result<(), AppError> {
         // Create a hashmap sha1 => set(branches)
         let mut branches_for_sha1: HashMap<String, HashSet<String>> = HashMap::new();
 
@@ -254,14 +278,14 @@ impl App {
             Ok(x) => x,
             Err(x) => {
                 self.ui.log_error("Failed to list branches");
-                return Err(x);
+                return Err(AppError::Git(x));
             }
         }
         .iter()
         .for_each(|(branch, sha1)| {
             let branch_set = branches_for_sha1
                 .entry(sha1.to_string())
-                .or_insert(HashSet::<String>::new());
+                .or_insert_with(HashSet::<String>::new);
             branch_set.insert(branch.to_string());
         });
 
@@ -278,6 +302,31 @@ impl App {
 
         Ok(())
     }
+
+    pub fn safe_delete_branch(&self, branch: &str) -> Result<(), AppError> {
+        // A branch is only safe to delete if at least another branch contains it
+        let contained_in = self.repo.list_branches_containing(branch).unwrap();
+        if contained_in.len() < 2 {
+            self.ui.log_error(&format!(
+                "Not deleting {}, no other branches contain it",
+                branch
+            ));
+            return Err(AppError::UnsafeDelete);
+        }
+        self.repo.delete_branch(branch)?;
+        Ok(())
+    }
+
+    pub fn run(&self) -> Result<(), AppError> {
+        if self.fetch {
+            self.fetch_changes()?;
+        }
+
+        self.update_tracking_branches()?;
+        self.delete_identical_branches()?;
+        self.remove_merged_branches()?;
+        Ok(())
+    }
 }
 
 pub fn run(args: CliArgs, dir: &str) -> i32 {
@@ -291,22 +340,8 @@ pub fn run(args: CliArgs, dir: &str) -> i32 {
         return 1;
     }
 
-    if !args.no_fetch {
-        if let Err(x) = app.fetch_changes() {
-            return x;
-        }
+    match app.run() {
+        Ok(()) => 0,
+        Err(_) => 1,
     }
-
-    if let Err(x) = app.update_tracking_branches() {
-        return x;
-    }
-
-    if let Err(x) = app.delete_identical_branches() {
-        return x;
-    }
-
-    if let Err(x) = app.remove_merged_branches() {
-        return x;
-    }
-    0
 }

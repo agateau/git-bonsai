@@ -69,7 +69,9 @@ impl AppUi for InteractiveAppUi {
         let selections = tui::select(
             "These branches point to the same commit, which is contained in another branch,\
             so it is safe to delete them all.\n\
-            Select branches to delete", &items);
+            Select branches to delete",
+            &items,
+        );
 
         selections
             .iter()
@@ -82,8 +84,10 @@ impl AppUi for InteractiveAppUi {
         items.sort();
 
         let mut selections: Vec<usize>;
-        println!("These branches point to the same commit, but no other branch contains this commit, \
-                so you can delete all of them but one.\n");
+        println!(
+            "These branches point to the same commit, but no other branch contains this commit, \
+                so you can delete all of them but one.\n"
+        );
         loop {
             selections = tui::select("Select branches to delete", &items);
             if selections.len() == items.len() {

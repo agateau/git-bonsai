@@ -35,12 +35,14 @@
     git push
     git push --tags
 
-- [ ] Download build artifacts from GitHub
+- [ ] Download build artifacts from CI
 
 - [ ] Publish Cargo package
 
     cargo publish
 
 - [ ] Publish binaries on GitHub
+
+- [ ] Bump version to x.y.z+1-alpha
 
 - [ ] Write blog post
