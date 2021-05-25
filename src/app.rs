@@ -91,17 +91,18 @@ impl App {
         }
     }
 
-    pub fn fetch_changes(&self) -> Result<(), GitError> {
+    pub fn fetch_changes(&self) -> Result<(), AppError> {
         self.ui.log_info("Fetching changes");
-        self.repo.fetch()
+        self.repo.fetch()?;
+        Ok(())
     }
 
-    pub fn update_tracking_branches(&self) -> Result<(), GitError> {
+    pub fn update_tracking_branches(&self) -> Result<(), AppError> {
         let branches = match self.repo.list_tracking_branches() {
             Ok(x) => x,
             Err(x) => {
                 self.ui.log_error("Failed to list tracking branches");
-                return Err(x);
+                return Err(AppError::Git(x));
             }
         };
 
@@ -110,7 +111,7 @@ impl App {
             self.ui.log_info(&format!("Updating {}", branch));
             if let Err(x) = self.repo.checkout(&branch) {
                 self.ui.log_error("Failed to checkout branch");
-                return Err(x);
+                return Err(AppError::Git(x));
             }
             if let Err(_x) = self.repo.update_branch() {
                 self.ui.log_warning("Failed to update branch");
@@ -120,7 +121,7 @@ impl App {
         }
         Ok(())
     }
-    pub fn remove_merged_branches(&self) -> Result<(), GitError> {
+    pub fn remove_merged_branches(&self) -> Result<(), AppError> {
         let to_delete = self.get_deletable_branches()?;
 
         if to_delete.is_empty() {
@@ -174,12 +175,12 @@ impl App {
         }
     }
 
-    fn get_deletable_branches(&self) -> Result<Vec<BranchToDeleteInfo>, GitError> {
+    fn get_deletable_branches(&self) -> Result<Vec<BranchToDeleteInfo>, AppError> {
         let deletable_branches: Vec<BranchToDeleteInfo> = match self.repo.list_branches() {
             Ok(x) => x,
             Err(x) => {
                 self.ui.log_error("Failed to list branches");
-                return Err(x);
+                return Err(AppError::Git(x));
             }
         }
         .iter()
@@ -226,7 +227,7 @@ impl App {
         &self,
         sha1: &str,
         branch_set: &HashSet<String>,
-    ) -> Result<(), GitError> {
+    ) -> Result<(), AppError> {
         let unprotected_branch_set: HashSet<_> =
             branch_set.difference(&self.protected_branches).collect();
         if !self
@@ -267,7 +268,7 @@ impl App {
         Ok(())
     }
 
-    pub fn delete_identical_branches(&self) -> Result<(), GitError> {
+    pub fn delete_identical_branches(&self) -> Result<(), AppError> {
         // Create a hashmap sha1 => set(branches)
         let mut branches_for_sha1: HashMap<String, HashSet<String>> = HashMap::new();
 
@@ -275,7 +276,7 @@ impl App {
             Ok(x) => x,
             Err(x) => {
                 self.ui.log_error("Failed to list branches");
-                return Err(x);
+                return Err(AppError::Git(x));
             }
         }
         .iter()
