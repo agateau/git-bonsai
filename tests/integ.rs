@@ -22,6 +22,7 @@ mod integ {
     extern crate claim;
     extern crate git_bonsai;
 
+    use std::collections::HashSet;
     use std::fs::File;
     use structopt::StructOpt;
 
@@ -268,5 +269,34 @@ mod integ {
 
         // AND the test branch still exists
         assert_eq!(repo.list_branches().unwrap(), &["master", "test"]);
+    }
+
+    #[test]
+    fn test_protected_branches_from_git_config() {
+        // GIVEN a repository with protected branches declared in git-config
+        let (dir, repo) = create_repository();
+        create_branch(&repo, "test");
+        repo.checkout("master").unwrap();
+        repo.git(
+            "config",
+            &["--add", "git-bonsai.protected-branches", "custom1"],
+        )
+        .unwrap();
+        repo.git(
+            "config",
+            &["--add", "git-bonsai.protected-branches", "custom2"],
+        )
+        .unwrap();
+
+        // WHEN app is instantiated
+        let app = create_app(&dir.path().to_str().unwrap(), &[]);
+
+        // THEN app.protected_branches contains the custom protected branch and the default
+        // branches
+        let expected_branches: HashSet<String> = ["master", "main", "custom1", "custom2"]
+            .iter()
+            .map(|x| x.to_string())
+            .collect();
+        assert_eq!(app.protected_branches, expected_branches);
     }
 }

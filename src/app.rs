@@ -52,20 +52,29 @@ impl fmt::Display for AppError {
 
 pub struct App {
     repo: Repository,
-    protected_branches: HashSet<String>,
+    pub protected_branches: HashSet<String>,
     ui: Box<dyn AppUi>,
     fetch: bool,
 }
 
 impl App {
     pub fn new(args: &CliArgs, ui: Box<dyn AppUi>, repo_dir: &str) -> App {
+        let repo = Repository::new(&PathBuf::from(repo_dir));
+
         let mut branches: HashSet<String> = HashSet::new();
         branches.insert("master".to_string());
+        branches.insert("main".to_string());
+        for branch in repo
+            .get_config_keys("git-bonsai.protected-branches")
+            .unwrap()
+        {
+            branches.insert(branch.to_string());
+        }
         for branch in &args.excluded {
             branches.insert(branch.to_string());
         }
         App {
-            repo: Repository::new(&PathBuf::from(repo_dir)),
+            repo: repo,
             protected_branches: branches,
             ui,
             fetch: !args.no_fetch,
