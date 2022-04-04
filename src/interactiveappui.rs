@@ -51,7 +51,7 @@ impl AppUi for InteractiveAppUi {
     ) -> Vec<BranchToDeleteInfo> {
         let select_items: Vec<String> = branch_infos
             .iter()
-            .map(|x| format_branch_info(&x))
+            .map(format_branch_info)
             .collect::<Vec<String>>();
 
         let selections = tui::select("Select branches to delete", &select_items);
