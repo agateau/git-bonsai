@@ -119,6 +119,12 @@ The easiest way to install is to download an archive from the [release page][rel
 
 Snapshots from the master branch are available from [builds.agateau.com/git-bonsai](https://builds.agateau.com/git-bonsai).
 
+## Configuration
+
+### Protected branches
+
+Git Bonsai considers branches called `main` and `master` as protected. You can add other protected branches using `git config --add git-bonsai protected-branches <branch-name>`.
+
 ## Building it
 
 Git Bonsai is written in [Rust][]. To build it, install Rust and then run:

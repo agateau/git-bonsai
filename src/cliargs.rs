@@ -18,10 +18,13 @@
  */
 use structopt::StructOpt;
 
-/// Keep a git repository clean and tidy.
 #[derive(StructOpt)]
+/// Keep a git repository clean and tidy.
+///
+/// Branches can be declared as protected from suppression using `git config --add
+/// git-bonsai.protected-branches <branch>`.
 pub struct CliArgs {
-    /// Branches to protect from suppression (in addition to master)
+    /// Other branches to protect from suppression.
     #[structopt(short = "x", long)]
     pub excluded: Vec<String>,
 

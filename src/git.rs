@@ -65,7 +65,7 @@ impl BranchRestorer<'_> {
     pub fn new(repo: &Repository) -> BranchRestorer {
         let current_branch = repo.get_current_branch().expect("Can't get current branch");
         BranchRestorer {
-            repository: &repo,
+            repository: repo,
             branch: current_branch,
         }
     }
@@ -138,6 +138,25 @@ impl Repository {
     pub fn fetch(&self) -> Result<(), GitError> {
         self.git("fetch", &["--prune"])?;
         Ok(())
+    }
+
+    /// Reads config keys defined with `git config --add <key> <value>`
+    pub fn get_config_keys(&self, key: &str) -> Result<Vec<String>, GitError> {
+        let stdout = match self.git("config", &["--get-all", key]) {
+            Ok(x) => x,
+            Err(x) => match x {
+                GitError::CommandFailed { exit_code: 1 } => {
+                    // Happens when reading a non-existing key
+                    return Ok([].to_vec());
+                }
+                x => {
+                    return Err(x);
+                }
+            },
+        };
+
+        let values: Vec<String> = stdout.lines().map(|x| x.into()).collect();
+        Ok(values)
     }
 
     pub fn list_branches(&self) -> Result<Vec<String>, GitError> {
