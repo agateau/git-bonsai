@@ -22,7 +22,7 @@
  */
 use console::style;
 
-use dialoguer::{theme::ColorfulTheme, Checkboxes};
+use dialoguer::{theme::ColorfulTheme, MultiSelect};
 
 pub fn log_warning(msg: &str) {
     println!("{}", style(format!("Warning: {}", msg)).yellow());
@@ -39,7 +39,7 @@ pub fn log_info(msg: &str) {
 pub fn select(msg: &str, items: &[String]) -> Vec<usize> {
     let checked_items: Vec<(String, bool)> = items.iter().map(|x| (x.clone(), true)).collect();
 
-    Checkboxes::with_theme(&ColorfulTheme::default())
+    MultiSelect::with_theme(&ColorfulTheme::default())
         .with_prompt(msg)
         .items_checked(&checked_items[..])
         .interact()
