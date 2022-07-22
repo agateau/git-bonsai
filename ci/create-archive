@@ -2,6 +2,8 @@
 set -euo pipefail
 
 init_system() {
+    ARCH=$(uname -m)
+
     local out
     out=$(uname)
 
@@ -55,7 +57,7 @@ fi
 
 ARTIFACTS_DIR=$PWD/artifacts
 ARCHIVE_DIR=$APP_NAME-$VERSION
-ARCHIVE_NAME=$APP_NAME-$VERSION-$OS_NAME.tar.bz2
+ARCHIVE_NAME=$APP_NAME-$VERSION-$ARCH-$OS_NAME.tar.bz2
 
 rm -rf $ARTIFACTS_DIR
 mkdir -p $ARTIFACTS_DIR/$ARCHIVE_DIR
