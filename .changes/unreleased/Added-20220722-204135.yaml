@@ -1,4 +1,0 @@
-kind: Added
-body: Make it possible to configure protected branches, using `git config`. See `git-bonsai
-  --help` for details.
-time: 2022-07-22T20:41:35.140765582+02:00
