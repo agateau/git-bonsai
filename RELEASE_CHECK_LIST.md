@@ -1,48 +1,31 @@
-- [ ] Check working tree is up to date and clean:
+## Prepare
 
-    git checkout dev
-    git pull
-    git merge origin/master
+- [ ] Setup
 
-- [ ] Bump version number in Cargo.toml
+    pip install invoke
+    export VERSION=<the-new-version>
 
-- [ ] Update CHANGELOG.md:
+- [ ] Prepare
 
-    r!git log --pretty=format:'- \%s (\%an)' x.y.z-1..HEAD
+    invoke prepare-release
 
-- [ ] Commit and push
+## Tag
 
-    git commit
-    git push
+- [ ] Wait for CI to be happy
 
-- [ ] Prepare Cargo package
+- [ ] Create tag
 
-    cargo publish --dry-run
-    cargo package --list
+    invoke tag
 
-- [ ] Merge
+## Publish
 
-    git bonsai
-    git checkout master
-    git merge --no-ff dev
+    invoke download-artifacts
+    invoke publish
 
-- [ ] Tag
+## Post publish
 
-    git tag -a x.y.z
+- [ ] Bump version to x.y.z+1-alpha.1
 
-- [ ] Push
-
-    git push
-    git push --tags
-
-- [ ] Download build artifacts from CI
-
-- [ ] Publish Cargo package
-
-    cargo publish
-
-- [ ] Publish binaries on GitHub
-
-- [ ] Bump version to x.y.z+1-alpha
+    VERSION=<the-new-version> invoke update-version
 
 - [ ] Write blog post
