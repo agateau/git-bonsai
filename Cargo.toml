@@ -1,6 +1,6 @@
 [package]
 name = "git-bonsai"
-version = "0.2.2-alpha"
+version = "0.2.2"
 authors = ["Aurélien Gâteau <mail@agateau.com>"]
 edition = "2018"
 description = "Command-line tool to clean the branches of your git garden"
