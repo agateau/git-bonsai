@@ -33,10 +33,30 @@ jobs:
     - name: Create archive
       run: ci/create-archive
 
-    - name: Upload
-      if: github.ref == 'refs/heads/master'
-      run: ci/upload-build git-bonsai artifacts/*.bz2
-      env:
-        UPLOAD_USERNAME: ${{ secrets.UPLOAD_USERNAME }}
-        UPLOAD_PRIVATE_KEY: ${{ secrets.UPLOAD_PRIVATE_KEY }}
-        UPLOAD_HOSTNAME: ${{ secrets.UPLOAD_HOSTNAME }}
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: artifacts
+        path: |
+          artifacts/*.bz2
+
+  server-upload:
+    needs: build
+    runs-on: ubuntu-20.04
+    if: github.ref == 'refs/heads/master'
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: artifacts
+          path: artifacts
+
+      - name: Upload to builds.agateau.com
+        run: ci/upload-build clyde artifacts/*.bz2
+        env:
+          UPLOAD_USERNAME: ${{ secrets.UPLOAD_USERNAME }}
+          UPLOAD_PRIVATE_KEY: ${{ secrets.UPLOAD_PRIVATE_KEY }}
+          UPLOAD_HOSTNAME: ${{ secrets.UPLOAD_HOSTNAME }}
