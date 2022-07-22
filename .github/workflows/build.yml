@@ -55,7 +55,7 @@ jobs:
           path: artifacts
 
       - name: Upload to builds.agateau.com
-        run: ci/upload-build clyde artifacts/*.bz2
+        run: ci/upload-build git-bonsai artifacts/*.bz2
         env:
           UPLOAD_USERNAME: ${{ secrets.UPLOAD_USERNAME }}
           UPLOAD_PRIVATE_KEY: ${{ secrets.UPLOAD_PRIVATE_KEY }}
