@@ -50,15 +50,19 @@ init_checksum_cmd
 echo "Checksum command: $CHECKSUM_CMD"
 
 define_version() {
-    local cargo_version=$(cargo pkgid | sed 's/.*#//')
-    local git_version=$(git describe)
-    if [ "$git_version" = "$cargo_version" ] ; then
-        # Looks like we are on a tag, just use $cargo_version
-        VERSION=$cargo_version
-    else
-        # Not a tag, append date and commit hash
-        VERSION=$cargo_version+$(git show --no-patch --format=%cd-%h --date=format:%Y%m%dT%H%M%S)
-    fi
+    local describe=$(git describe)
+    echo "git describe: $describe"
+    case "$describe" in
+        *-*-g*)
+            echo "Building a snapshot"
+            VERSION=${describe//-*/}+$(git show --no-patch --format=%cd-%h --date=format:%Y%m%dT%H%M%S)
+            ;;
+        *)
+            echo "Building from a tag"
+            VERSION=$describe
+            ;;
+    esac
+    echo "VERSION=$VERSION"
 }
 
 define_version
@@ -71,7 +75,6 @@ rm -rf $ARTIFACTS_DIR
 mkdir -p $ARTIFACTS_DIR/$ARCHIVE_DIR
 
 echo "Copying and stripping binary"
-ls
 cp target/release/$EXE_NAME $ARTIFACTS_DIR/$ARCHIVE_DIR
 strip $ARTIFACTS_DIR/$ARCHIVE_DIR/$EXE_NAME
 
@@ -80,7 +83,7 @@ cp $DATA_FILES $ARTIFACTS_DIR/$ARCHIVE_DIR
 
 echo "Creating archive $ARTIFACTS_DIR/$ARCHIVE_NAME"
 cd $ARTIFACTS_DIR
-tar -cjf $ARCHIVE_NAME $ARCHIVE_DIR
+tar -cjvf $ARCHIVE_NAME $ARCHIVE_DIR
 
 echo "Computing checksum"
 $CHECKSUM_CMD $ARCHIVE_NAME
