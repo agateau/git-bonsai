@@ -75,7 +75,6 @@ rm -rf $ARTIFACTS_DIR
 mkdir -p $ARTIFACTS_DIR/$ARCHIVE_DIR
 
 echo "Copying and stripping binary"
-ls
 cp target/release/$EXE_NAME $ARTIFACTS_DIR/$ARCHIVE_DIR
 strip $ARTIFACTS_DIR/$ARCHIVE_DIR/$EXE_NAME
 
@@ -84,7 +83,7 @@ cp $DATA_FILES $ARTIFACTS_DIR/$ARCHIVE_DIR
 
 echo "Creating archive $ARTIFACTS_DIR/$ARCHIVE_NAME"
 cd $ARTIFACTS_DIR
-tar -cjf $ARCHIVE_NAME $ARCHIVE_DIR
+tar -cjvf $ARCHIVE_NAME $ARCHIVE_DIR
 
 echo "Computing checksum"
 $CHECKSUM_CMD $ARCHIVE_NAME
