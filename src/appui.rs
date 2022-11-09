@@ -40,4 +40,6 @@ pub trait AppUi {
     fn select_identical_branches_to_delete(&self, branches: &[String]) -> Vec<String>;
 
     fn select_identical_branches_to_delete_keep_one(&self, branches: &[String]) -> Vec<String>;
+
+    fn select_default_branch(&self, branches: &[String]) -> Option<String>;
 }
