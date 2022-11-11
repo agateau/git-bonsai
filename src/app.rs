@@ -27,7 +27,7 @@ use crate::cliargs::CliArgs;
 use crate::git::{BranchRestorer, GitError, Repository};
 use crate::interactiveappui::InteractiveAppUi;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum AppError {
     Git(GitError),
     UnsafeDelete,

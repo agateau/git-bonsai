@@ -29,7 +29,7 @@ const GIT_BONSAI_DEBUG: &str = "GB_DEBUG";
 // string
 const WORKTREE_BRANCH_PREFIX: &str = "+ ";
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum GitError {
     FailedToRunGit,
     CommandFailed { exit_code: i32 },
