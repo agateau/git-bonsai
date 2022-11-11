@@ -129,7 +129,9 @@ Git Bonsai considers branches called `main` and `master` as protected. You can a
 
 Git Bonsai is written in [Rust][]. To build it, install Rust and then run:
 
-    cargo install git-bonsai
+```
+cargo install git-bonsai
+```
 
 [Rust]: https://www.rust-lang.org
 

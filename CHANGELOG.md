@@ -6,8 +6,6 @@
 
 - Make it possible to configure protected branches, using `git config`. See `git-bonsai --help` for details.
 
-# Changelog
-
 ## 0.2.1 - 2021-05-25
 
 ### Changed
