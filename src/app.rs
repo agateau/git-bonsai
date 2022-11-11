@@ -92,7 +92,7 @@ impl App {
     }
 
     pub fn is_working_tree_clean(&self) -> bool {
-        if self.repo.get_current_branch() == None {
+        if self.repo.get_current_branch().is_none() {
             self.ui.log_error("No current branch");
             return false;
         }

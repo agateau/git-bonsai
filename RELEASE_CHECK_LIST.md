@@ -2,12 +2,16 @@
 
 - [ ] Setup
 
-    pip install invoke
-    export VERSION=<the-new-version>
+```
+pip install invoke
+export VERSION=<the-new-version>
+```
 
 - [ ] Prepare
 
-    invoke prepare-release
+```
+invoke prepare-release
+```
 
 ## Tag
 
@@ -15,17 +19,23 @@
 
 - [ ] Create tag
 
-    invoke tag
+```
+invoke tag
+```
 
 ## Publish
 
-    invoke download-artifacts
-    invoke publish
+```
+invoke download-artifacts
+invoke publish
+```
 
 ## Post publish
 
 - [ ] Bump version to x.y.z+1-alpha.1
 
-    VERSION=<the-new-version> invoke update-version
+```
+VERSION=<the-new-version> invoke update-version
+```
 
 - [ ] Write blog post
