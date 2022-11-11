@@ -22,7 +22,7 @@
  */
 use console::style;
 
-use dialoguer::MultiSelect;
+use dialoguer::{MultiSelect, Select};
 
 pub fn log_warning(msg: &str) {
     println!("{}", style(format!("Warning: {}", msg)).yellow());
@@ -43,5 +43,14 @@ pub fn select(msg: &str, items: &[String]) -> Vec<usize> {
         .with_prompt(msg)
         .items_checked(&checked_items[..])
         .interact()
+        .unwrap()
+}
+
+pub fn select_one(msg: &str, items: &[String]) -> Option<usize> {
+    Select::new()
+        .with_prompt(msg)
+        .items(items)
+        .default(0)
+        .interact_opt()
         .unwrap()
 }

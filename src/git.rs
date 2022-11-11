@@ -34,6 +34,7 @@ pub enum GitError {
     FailedToRunGit,
     CommandFailed { exit_code: i32 },
     TerminatedBySignal,
+    UnexpectedOutput(String),
 }
 
 impl fmt::Display for GitError {
@@ -47,6 +48,9 @@ impl fmt::Display for GitError {
             }
             GitError::TerminatedBySignal => {
                 write!(f, "Terminated by signal")
+            }
+            GitError::UnexpectedOutput(message) => {
+                write!(f, "UnexpectedOutput: {}", message)
             }
         }
     }
@@ -157,6 +161,35 @@ impl Repository {
 
         let values: Vec<String> = stdout.lines().map(|x| x.into()).collect();
         Ok(values)
+    }
+
+    pub fn set_config_key(&self, key: &str, value: &str) -> Result<(), GitError> {
+        self.git("config", &[key, value])?;
+        Ok(())
+    }
+
+    pub fn find_default_branch(&self) -> Result<String, GitError> {
+        let stdout = self.git("ls-remote", &["--symref", "origin", "HEAD"])?;
+        /* Output looks like this:
+         *
+         * ref: refs/heads/master\tHEAD
+         * 960389f1c69e8b9c3fe06d29866d0d193375a6cb\tHEAD
+         *
+         * We want to extra "master" from the first line
+         */
+        let line = stdout.lines().next().ok_or_else(|| {
+            GitError::UnexpectedOutput("ls-remote returned an empty string".to_string())
+        })?;
+
+        let line = line
+            .strip_prefix("ref: refs/heads/")
+            .ok_or_else(|| GitError::UnexpectedOutput("missing prefix".to_string()))?;
+
+        let line = line
+            .strip_suffix("\tHEAD")
+            .ok_or_else(|| GitError::UnexpectedOutput("missing suffix".to_string()))?;
+
+        Ok(line.to_string())
     }
 
     pub fn list_branches(&self) -> Result<Vec<String>, GitError> {
@@ -367,5 +400,38 @@ mod tests {
         // THEN it does not list worktree branches
         assert_eq!(branches.len(), 1);
         assert_eq!(branches, &["master"]);
+    }
+
+    #[test]
+    fn find_default_branch_happy_path() {
+        // GIVEN a source repository
+        let tmp_dir = assert_fs::TempDir::new().unwrap();
+        let source_path = tmp_dir.path().join("source");
+        fs::create_dir_all(&source_path).unwrap();
+        create_test_repository(&source_path);
+
+        // AND a clone of this repository
+        let clone_path = tmp_dir.path().join("clone");
+        fs::create_dir_all(&clone_path).unwrap();
+        let clone_repo = Repository::clone(&clone_path, &source_path.to_str().unwrap()).unwrap();
+
+        // WHEN I call find_default_branch() on the clone
+        let branch = clone_repo.find_default_branch();
+
+        // THEN it finds the default branch name
+        assert_eq!(branch, Ok("master".to_string()));
+    }
+
+    #[test]
+    fn find_default_branch_no_remote() {
+        // GIVEN a repository without a remote
+        let tmp_dir = assert_fs::TempDir::new().unwrap();
+        let repo = create_test_repository(&tmp_dir.path());
+
+        // WHEN I call find_default_branch()
+        let branch = repo.find_default_branch();
+
+        // THEN it fails
+        assert_eq!(branch, Err(GitError::CommandFailed { exit_code: 128 }));
     }
 }

@@ -101,4 +101,12 @@ impl AppUi for InteractiveAppUi {
             .map(|&x| items[x].clone())
             .collect::<Vec<String>>()
     }
+
+    fn select_default_branch(&self, branches: &[String]) -> Option<String> {
+        let mut items = branches.to_vec();
+        items.sort();
+
+        tui::select_one("Select the branch to use as the default branch", &items)
+            .map(|x| items[x].clone())
+    }
 }

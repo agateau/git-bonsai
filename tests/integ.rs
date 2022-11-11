@@ -30,7 +30,7 @@ mod integ {
     use claim::*;
     use predicates::prelude::*;
 
-    use git_bonsai::app::{self, App, AppError};
+    use git_bonsai::app::{self, App, AppError, DEFAULT_BRANCH_CONFIG_KEY};
     use git_bonsai::batchappui::BatchAppUi;
     use git_bonsai::cliargs::CliArgs;
     use git_bonsai::git::create_test_repository;
@@ -39,6 +39,8 @@ mod integ {
     fn create_repository() -> (assert_fs::TempDir, Repository) {
         let dir = assert_fs::TempDir::new().unwrap();
         let repo = create_test_repository(dir.path());
+        repo.set_config_key(DEFAULT_BRANCH_CONFIG_KEY, "master")
+            .unwrap();
         (dir, repo)
     }
 
@@ -289,14 +291,14 @@ mod integ {
         .unwrap();
 
         // WHEN app is instantiated
-        let app = create_app(&dir.path().to_str().unwrap(), &[]);
+        let mut app = create_app(&dir.path().to_str().unwrap(), &[]);
+        app.add_default_branch_to_protected_branches().unwrap();
 
-        // THEN app.protected_branches contains the custom protected branch and the default
-        // branches
-        let expected_branches: HashSet<String> = ["master", "main", "custom1", "custom2"]
+        // THEN app.protected_branches contains all protected branches
+        let expected_branches: HashSet<String> = ["custom1", "custom2", "master"]
             .iter()
             .map(|x| x.to_string())
             .collect();
-        assert_eq!(app.protected_branches, expected_branches);
+        assert_eq!(app.get_protected_branches(), expected_branches);
     }
 }

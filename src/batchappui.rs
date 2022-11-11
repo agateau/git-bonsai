@@ -51,4 +51,8 @@ impl AppUi for BatchAppUi {
         to_delete.remove(0);
         to_delete
     }
+
+    fn select_default_branch(&self, _branches: &[String]) -> Option<String> {
+        None
+    }
 }

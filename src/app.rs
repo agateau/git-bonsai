@@ -27,10 +27,13 @@ use crate::cliargs::CliArgs;
 use crate::git::{BranchRestorer, GitError, Repository};
 use crate::interactiveappui::InteractiveAppUi;
 
+pub static DEFAULT_BRANCH_CONFIG_KEY: &str = "git-bonsai.default-branch";
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum AppError {
     Git(GitError),
     UnsafeDelete,
+    InterruptedByUser,
 }
 
 impl From<GitError> for AppError {
@@ -46,13 +49,16 @@ impl fmt::Display for AppError {
             AppError::UnsafeDelete => {
                 write!(f, "This branch cannot be deleted safely")
             }
+            AppError::InterruptedByUser => {
+                write!(f, "Interrupted")
+            }
         }
     }
 }
 
 pub struct App {
     repo: Repository,
-    pub protected_branches: HashSet<String>,
+    protected_branches: HashSet<String>,
     ui: Box<dyn AppUi>,
     fetch: bool,
 }
@@ -62,8 +68,6 @@ impl App {
         let repo = Repository::new(&PathBuf::from(repo_dir));
 
         let mut branches: HashSet<String> = HashSet::new();
-        branches.insert("master".to_string());
-        branches.insert("main".to_string());
         for branch in repo
             .get_config_keys("git-bonsai.protected-branches")
             .unwrap()
@@ -79,6 +83,12 @@ impl App {
             ui,
             fetch: !args.no_fetch,
         }
+    }
+
+    // Used by test code
+    #[allow(dead_code)]
+    pub fn get_protected_branches(&self) -> HashSet<String> {
+        self.protected_branches.clone()
     }
 
     pub fn is_working_tree_clean(&self) -> bool {
@@ -99,6 +109,51 @@ impl App {
                 self.ui.log_error("Failed to get working tree status");
                 false
             }
+        }
+    }
+
+    /// Ask git the name of the default branch, and store the result in git config. If we can't
+    /// find it using git, fallback to asking the user.
+    pub fn find_default_branch_from_git(&self) -> Result<String, AppError> {
+        self.ui.log_info("Determining repository default branch");
+        let branch = match self.repo.find_default_branch() {
+            Ok(x) => x,
+            Err(err) => {
+                self.ui.log_error(&format!(
+                    "Can't determine default branch: {}",
+                    &err.to_string()
+                ));
+                return self.find_default_branch_from_user();
+            }
+        };
+        self.repo
+            .set_config_key(DEFAULT_BRANCH_CONFIG_KEY, &branch)?;
+        self.ui.log_info(&format!("Default branch is {}", branch));
+        Ok(branch)
+    }
+
+    /// Ask the user the name of the default branch, and store the result in git config
+    pub fn find_default_branch_from_user(&self) -> Result<String, AppError> {
+        let branch = match self.ui.select_default_branch(&self.repo.list_branches()?) {
+            Some(x) => x,
+            None => {
+                return Err(AppError::InterruptedByUser);
+            }
+        };
+        self.repo
+            .set_config_key(DEFAULT_BRANCH_CONFIG_KEY, &branch)?;
+        Ok(branch)
+    }
+
+    /// Return the default branch stored in git config, if any
+    pub fn get_default_branch(&self) -> Result<Option<String>, AppError> {
+        match self.repo.get_config_keys(DEFAULT_BRANCH_CONFIG_KEY) {
+            Ok(values) => Ok(if values.len() != 1 {
+                None
+            } else {
+                Some(values[0].clone())
+            }),
+            Err(x) => Err(AppError::Git(x)),
         }
     }
 
@@ -149,41 +204,41 @@ impl App {
             .iter()
             .map(|x| x.name.to_string())
             .collect();
-        self.delete_branches(&branch_names[..]);
+        self.delete_branches(&branch_names[..])?;
         Ok(())
     }
 
     /// Delete the specified branches, takes care of checking out another branch if we are deleting
     /// the current one
-    fn delete_branches(&self, branches: &[String]) {
+    fn delete_branches(&self, branches: &[String]) -> Result<(), AppError> {
         let current_branch = self.repo.get_current_branch().unwrap();
-        for branch in branches {
-            if *branch == current_branch {
-                let fallback_branch = match self.protected_branches.iter().next() {
-                    Some(x) => x,
-                    None => {
-                        self.ui.log_warning(
-                            "No fallback branch to switch to before deleting the current branch",
-                        );
-                        return;
-                    }
-                };
-                self.ui.log_info(&format!(
-                    "Switching to {} before deleting {}",
-                    fallback_branch, current_branch
-                ));
-                if self.repo.checkout(fallback_branch).is_err() {
-                    self.ui.log_warning("Failed to switch to fallback branch");
-                    return;
-                }
-            }
 
+        let mut current_branch_deleted = false;
+        let default_branch = self.get_default_branch().unwrap().unwrap();
+
+        match self.repo.checkout(&default_branch) {
+            Ok(()) => (),
+            Err(x) => {
+                let msg = format!("Failed to switch to default branch '{}'", default_branch);
+                self.ui.log_error(&msg);
+                return Err(AppError::Git(x));
+            }
+        }
+
+        for branch in branches {
             self.ui.log_info(&format!("Deleting {}", branch));
 
             if self.safe_delete_branch(branch).is_err() {
                 self.ui.log_warning("Failed to delete branch");
+            } else if *branch == current_branch {
+                current_branch_deleted = true;
             }
         }
+
+        if !current_branch_deleted {
+            self.repo.checkout(&current_branch)?;
+        }
+        Ok(())
     }
 
     fn get_deletable_branches(&self) -> Result<Vec<BranchToDeleteInfo>, AppError> {
@@ -257,7 +312,7 @@ impl App {
                     .iter()
                     .map(|x| x.to_string())
                     .collect();
-                self.delete_branches(&selected_branches);
+                self.delete_branches(&selected_branches)?;
                 return Ok(());
             }
         }
@@ -275,7 +330,7 @@ impl App {
             .iter()
             .map(|x| x.to_string())
             .collect();
-        self.delete_branches(&selected_branches);
+        self.delete_branches(&selected_branches)?;
         Ok(())
     }
 
@@ -326,7 +381,23 @@ impl App {
         Ok(())
     }
 
-    pub fn run(&self) -> Result<(), AppError> {
+    pub fn add_default_branch_to_protected_branches(&mut self) -> Result<(), AppError> {
+        let default_branch = match self.get_default_branch()? {
+            Some(x) => x,
+            None => {
+                if self.fetch {
+                    self.find_default_branch_from_git()?
+                } else {
+                    self.find_default_branch_from_user()?
+                }
+            }
+        };
+        self.protected_branches.insert(default_branch);
+        Ok(())
+    }
+
+    pub fn run(&mut self) -> Result<(), AppError> {
+        self.add_default_branch_to_protected_branches()?;
         if self.fetch {
             self.fetch_changes()?;
         }
@@ -343,7 +414,7 @@ pub fn run(args: CliArgs, dir: &str) -> i32 {
         false => Box::new(InteractiveAppUi {}),
         true => Box::new(BatchAppUi {}),
     };
-    let app = App::new(&args, ui, dir);
+    let mut app = App::new(&args, ui, dir);
 
     if !app.is_working_tree_clean() {
         return 1;
