@@ -1,3 +1,0 @@
-kind: Changed
-body: Git Bonsai now detects the default branch and always considers it protected.
-time: 2022-11-11T19:18:51.239479015+01:00

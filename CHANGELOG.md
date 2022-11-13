@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0 - 2022-11-13
+
+### Changed
+
+- Git Bonsai now detects the default branch and always considers it protected.
+
 ## 0.2.2 - 2022-07-22
 
 ### Added
