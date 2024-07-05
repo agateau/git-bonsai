@@ -347,9 +347,7 @@ impl App {
         }
         .iter()
         .for_each(|(branch, sha1)| {
-            let branch_set = branches_for_sha1
-                .entry(sha1.to_string())
-                .or_insert_with(HashSet::<String>::new);
+            let branch_set = branches_for_sha1.entry(sha1.to_string()).or_default();
             branch_set.insert(branch.to_string());
         });
 

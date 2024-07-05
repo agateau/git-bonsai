@@ -66,7 +66,7 @@ pub struct BranchRestorer<'a> {
 }
 
 impl BranchRestorer<'_> {
-    pub fn new(repo: &Repository) -> BranchRestorer {
+    pub fn new(repo: &Repository) -> BranchRestorer<'_> {
         let current_branch = repo.get_current_branch().expect("Can't get current branch");
         BranchRestorer {
             repository: repo,
