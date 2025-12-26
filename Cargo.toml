@@ -15,7 +15,7 @@ categories = ["command-line-utilities", "development-tools"]
 [dependencies]
 structopt = "0.3.26"
 dialoguer = "0.12.0"
-console = "0.15.0"
+console = "0.16.2"
 
 [dev-dependencies]
 assert_fs = "1.0.7"
