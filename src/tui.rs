@@ -37,11 +37,11 @@ pub fn log_info(msg: &str) {
 }
 
 pub fn select(msg: &str, items: &[String]) -> Vec<usize> {
-    let checked_items: Vec<(String, bool)> = items.iter().map(|x| (x.clone(), true)).collect();
+    let checked_items = items.iter().map(|x| (x.clone(), true));
 
     MultiSelect::new()
         .with_prompt(msg)
-        .items_checked(&checked_items[..])
+        .items_checked(checked_items)
         .interact()
         .unwrap()
 }
