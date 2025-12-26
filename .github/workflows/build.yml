@@ -10,7 +10,7 @@ on:
 
 jobs:
   lint:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
 
@@ -28,9 +28,9 @@ jobs:
       fail-fast: false
       matrix:
         os:
-        - ubuntu-20.04
-        - macos-12
-        - windows-2019
+        - ubuntu-22.04
+        - macos-14
+        - windows-2022
 
     runs-on: ${{ matrix.os }}
 
@@ -39,7 +39,7 @@ jobs:
         shell: bash
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         # Use `fetch-depth: 0` otherwise `git describe` does not see valid
         # tags, causing ci/create-archive to create snapshot archives. This
@@ -60,25 +60,26 @@ jobs:
       run: ci/create-archive
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: artifacts
+        name: artifacts-${{ matrix.os }}
         path: |
           artifacts/*.bz2
 
   server-upload:
     needs: build
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     if: github.ref == 'refs/heads/master'
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
-          name: artifacts
           path: artifacts
+          pattern: artifacts-*
+          merge-multiple: true
 
       - name: Upload to builds.agateau.com
         run: ci/upload-build git-bonsai artifacts/*.bz2
