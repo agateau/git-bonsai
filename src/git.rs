@@ -29,6 +29,11 @@ const GIT_BONSAI_DEBUG: &str = "GB_DEBUG";
 // string
 const WORKTREE_BRANCH_PREFIX: &str = "+ ";
 
+// Used by test code when creating repositories.
+// Use neither `main` nor `master` to ensure we do not depend on the local setting for the initial
+// branch.
+pub const INITIAL_BRANCH: &str = "initial-branch";
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum GitError {
     FailedToRunGit,
@@ -66,7 +71,7 @@ pub struct BranchRestorer<'a> {
 }
 
 impl BranchRestorer<'_> {
-    pub fn new(repo: &Repository) -> BranchRestorer {
+    pub fn new(repo: &Repository) -> BranchRestorer<'_> {
         let current_branch = repo.get_current_branch().expect("Can't get current branch");
         BranchRestorer {
             repository: repo,
@@ -172,10 +177,10 @@ impl Repository {
         let stdout = self.git("ls-remote", &["--symref", "origin", "HEAD"])?;
         /* Output looks like this:
          *
-         * ref: refs/heads/master\tHEAD
+         * ref: refs/heads/main\tHEAD
          * 960389f1c69e8b9c3fe06d29866d0d193375a6cb\tHEAD
          *
-         * We want to extra "master" from the first line
+         * We want the extra "main" from the first line
          */
         let line = stdout.lines().next().ok_or_else(|| {
             GitError::UnexpectedOutput("ls-remote returned an empty string".to_string())
@@ -290,7 +295,8 @@ impl Repository {
 pub fn create_test_repository(path: &Path) -> Repository {
     let repo = Repository::new(path);
 
-    repo.git("init", &[]).expect("init failed");
+    repo.git("init", &["--initial-branch", INITIAL_BRANCH])
+        .expect("init failed");
     repo.git("config", &["user.name", "test"])
         .expect("setting username failed");
     repo.git("config", &["user.email", "test@example.com"])
@@ -315,7 +321,7 @@ mod tests {
     fn get_current_branch() {
         let dir = assert_fs::TempDir::new().unwrap();
         let repo = create_test_repository(dir.path());
-        assert_eq!(repo.get_current_branch().unwrap(), "master");
+        assert_eq!(repo.get_current_branch().unwrap(), INITIAL_BRANCH);
 
         repo.git("checkout", &["-b", "test"])
             .expect("create branch failed");
@@ -327,7 +333,7 @@ mod tests {
         // GIVEN a repository with a test branch containing unique content
         let dir = assert_fs::TempDir::new().unwrap();
         let repo = create_test_repository(dir.path());
-        assert_eq!(repo.get_current_branch().unwrap(), "master");
+        assert_eq!(repo.get_current_branch().unwrap(), INITIAL_BRANCH);
 
         repo.git("checkout", &["-b", "test"]).unwrap();
         File::create(dir.path().join("test")).unwrap();
@@ -335,7 +341,7 @@ mod tests {
         repo.git("commit", &["-m", &format!("Create file")])
             .unwrap();
 
-        repo.checkout("master").unwrap();
+        repo.checkout(INITIAL_BRANCH).unwrap();
 
         // WHEN I call delete_branch
         let result = repo.delete_branch("test");
@@ -343,8 +349,8 @@ mod tests {
         // THEN the branch is deleted
         assert_eq!(result, Ok(()));
 
-        // AND only the master branch remains
-        assert_eq!(repo.list_branches().unwrap(), &["master"]);
+        // AND only the main branch remains
+        assert_eq!(repo.list_branches().unwrap(), &[INITIAL_BRANCH]);
     }
 
     #[test]
@@ -399,7 +405,7 @@ mod tests {
 
         // THEN it does not list worktree branches
         assert_eq!(branches.len(), 1);
-        assert_eq!(branches, &["master"]);
+        assert_eq!(branches, &[INITIAL_BRANCH]);
     }
 
     #[test]
@@ -419,7 +425,7 @@ mod tests {
         let branch = clone_repo.find_default_branch();
 
         // THEN it finds the default branch name
-        assert_eq!(branch, Ok("master".to_string()));
+        assert_eq!(branch, Ok(INITIAL_BRANCH.to_string()));
     }
 
     #[test]

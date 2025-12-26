@@ -1,5 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
+
+INIT_BRANCH=main
 
 create_branch() {
     local base=$1
@@ -19,22 +21,22 @@ rm -rf demo
 mkdir demo
 cd demo
 
-git init
+git init --initial-branch=$INIT_BRANCH
 touch README
 git add README
 git commit -m "Init" README
 
-create_branch master topic1
+create_branch $INIT_BRANCH topic1
 create_branch topic1 topic1-1
-create_branch master topic2
+create_branch $INIT_BRANCH topic2
 
 git checkout topic1
 merge topic1-1
 
-git checkout master
+git checkout $INIT_BRANCH
 merge topic1
 
 # Create two branches pointing to the same commit
-create_branch master duplicate1
+create_branch $INIT_BRANCH duplicate1
 git branch duplicate2
-git checkout master
+git checkout $INIT_BRANCH

@@ -33,13 +33,12 @@ mod integ {
     use git_bonsai::app::{self, App, AppError, DEFAULT_BRANCH_CONFIG_KEY};
     use git_bonsai::batchappui::BatchAppUi;
     use git_bonsai::cliargs::CliArgs;
-    use git_bonsai::git::create_test_repository;
-    use git_bonsai::git::Repository;
+    use git_bonsai::git::{create_test_repository, Repository, INITIAL_BRANCH};
 
     fn create_repository() -> (assert_fs::TempDir, Repository) {
         let dir = assert_fs::TempDir::new().unwrap();
         let repo = create_test_repository(dir.path());
-        repo.set_config_key(DEFAULT_BRANCH_CONFIG_KEY, "master")
+        repo.set_config_key(DEFAULT_BRANCH_CONFIG_KEY, INITIAL_BRANCH)
             .unwrap();
         (dir, repo)
     }
@@ -109,11 +108,11 @@ mod integ {
         let path_str = dir.path().to_str().unwrap();
         create_branch(&repo, "topic1");
         create_branch(&repo, "topic2");
-        // AND topic1 has been merged in master
-        repo.checkout("master").unwrap();
+        // AND topic1 has been merged in main
+        repo.checkout(INITIAL_BRANCH).unwrap();
         merge_branch(&repo, "topic1");
 
-        assert_branches_eq!(&repo, &["master", "topic1", "topic2"]);
+        assert_branches_eq!(&repo, &[INITIAL_BRANCH, "topic1", "topic2"]);
 
         // WHEN git-bonsai runs
         {
@@ -122,7 +121,7 @@ mod integ {
         }
 
         // THEN only the topic1 branch has been removed
-        assert_branches_eq!(&repo, &["master", "topic2"]);
+        assert_branches_eq!(&repo, &[INITIAL_BRANCH, "topic2"]);
     }
 
     #[test]
@@ -131,10 +130,10 @@ mod integ {
         let (dir, repo) = create_repository();
         let path_str = dir.path().to_str().unwrap();
         create_branch(&repo, "protected");
-        repo.checkout("master").unwrap();
+        repo.checkout(INITIAL_BRANCH).unwrap();
         merge_branch(&repo, "protected");
 
-        assert_branches_eq!(&repo, &["master", "protected"]);
+        assert_branches_eq!(&repo, &[INITIAL_BRANCH, "protected"]);
 
         // WHEN git-bonsai runs with "-x protected"
         {
@@ -143,7 +142,7 @@ mod integ {
         }
 
         // THEN the protected branch is still there
-        assert_branches_eq!(&repo, &["master", "protected"]);
+        assert_branches_eq!(&repo, &[INITIAL_BRANCH, "protected"]);
 
         // WHEN git-bonsai runs without "-x protected"
         {
@@ -152,7 +151,7 @@ mod integ {
         }
 
         // THEN the protected branch is gone
-        assert_branches_eq!(&repo, &["master"]);
+        assert_branches_eq!(&repo, &[INITIAL_BRANCH]);
     }
 
     #[test]
@@ -190,12 +189,12 @@ mod integ {
         assert_ok!(app.delete_identical_branches());
 
         // THEN only the first topic branch remains
-        assert_branches_eq!(&repo, &["master", "topic1"]);
+        assert_branches_eq!(&repo, &[INITIAL_BRANCH, "topic1"]);
     }
 
     #[test]
     fn identical_sha1_contained_in_master() {
-        // GIVEN a repository with two branches pointing to the same sha1, contained in the master
+        // GIVEN a repository with two branches pointing to the same sha1, contained in the main
         // branch
         let (dir, repo) = create_repository();
         let path_str = dir.path().to_str().unwrap();
@@ -206,8 +205,8 @@ mod integ {
         let app = create_app(&path_str, &[]);
         assert_ok!(app.delete_identical_branches());
 
-        // THEN only the master branch remains
-        assert_branches_eq!(&repo, &["master"]);
+        // THEN only the main branch remains
+        assert_branches_eq!(&repo, &[INITIAL_BRANCH]);
     }
 
     #[test]
@@ -215,7 +214,7 @@ mod integ {
         // GIVEN a source repository with two branches
         let (source_dir, source_repo) = create_repository();
         create_branch(&source_repo, "topic1");
-        source_repo.checkout("master").unwrap();
+        source_repo.checkout(INITIAL_BRANCH).unwrap();
 
         // AND a clone of this repository
         let (clone_dir, clone_repo) = clone_repository(source_dir.path().to_str().unwrap());
@@ -239,10 +238,10 @@ mod integ {
 
     #[test]
     fn safe_delete_branch() {
-        // GIVEN a repository with a test branch equals to master
+        // GIVEN a repository with a test branch equals to main
         let (dir, repo) = create_repository();
         repo.git("branch", &["test"]).unwrap();
-        repo.checkout("master").unwrap();
+        repo.checkout(INITIAL_BRANCH).unwrap();
 
         // WHEN I call safe_delete_branch
         let app = create_app(&dir.path().to_str().unwrap(), &[]);
@@ -251,8 +250,8 @@ mod integ {
         // THEN it succeeds
         assert_eq!(result, Ok(()));
 
-        // AND only the master branch remains
-        assert_eq!(repo.list_branches().unwrap(), &["master"]);
+        // AND only the main branch remains
+        assert_eq!(repo.list_branches().unwrap(), &[INITIAL_BRANCH]);
     }
 
     #[test]
@@ -260,7 +259,7 @@ mod integ {
         // GIVEN a repository with a test branch containing unique content
         let (dir, repo) = create_repository();
         create_branch(&repo, "test");
-        repo.checkout("master").unwrap();
+        repo.checkout(INITIAL_BRANCH).unwrap();
 
         // WHEN I call safe_delete_branch
         let app = create_app(&dir.path().to_str().unwrap(), &[]);
@@ -270,7 +269,7 @@ mod integ {
         assert_eq!(result, Err(AppError::UnsafeDelete));
 
         // AND the test branch still exists
-        assert_eq!(repo.list_branches().unwrap(), &["master", "test"]);
+        assert_eq!(repo.list_branches().unwrap(), &[INITIAL_BRANCH, "test"]);
     }
 
     #[test]
@@ -278,7 +277,7 @@ mod integ {
         // GIVEN a repository with protected branches declared in git-config
         let (dir, repo) = create_repository();
         create_branch(&repo, "test");
-        repo.checkout("master").unwrap();
+        repo.checkout(INITIAL_BRANCH).unwrap();
         repo.git(
             "config",
             &["--add", "git-bonsai.protected-branches", "custom1"],
@@ -295,7 +294,7 @@ mod integ {
         app.add_default_branch_to_protected_branches().unwrap();
 
         // THEN app.protected_branches contains all protected branches
-        let expected_branches: HashSet<String> = ["custom1", "custom2", "master"]
+        let expected_branches: HashSet<String> = ["custom1", "custom2", INITIAL_BRANCH]
             .iter()
             .map(|x| x.to_string())
             .collect();
