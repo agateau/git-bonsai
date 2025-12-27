@@ -17,10 +17,11 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 use std::env;
-use std::fmt;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+use thiserror::Error;
 
 // Define this environment variable to print all executed git commands to stderr
 const GIT_BONSAI_DEBUG: &str = "GB_DEBUG";
@@ -36,31 +37,16 @@ pub const INITIAL_BRANCH: &str = "initial-branch";
 
 type GitResult<T> = Result<T, GitError>;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum GitError {
+    #[error("failed to run git")]
     FailedToRunGit,
+    #[error("command exited with code {exit_code:?}")]
     CommandFailed { exit_code: i32 },
+    #[error("terminated by signal")]
     TerminatedBySignal,
+    #[error("unexpected output: {0}")]
     UnexpectedOutput(String),
-}
-
-impl fmt::Display for GitError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            GitError::FailedToRunGit => {
-                write!(f, "Failed to run git")
-            }
-            GitError::CommandFailed { exit_code: e } => {
-                write!(f, "Command exited with code {}", e)
-            }
-            GitError::TerminatedBySignal => {
-                write!(f, "Terminated by signal")
-            }
-            GitError::UnexpectedOutput(message) => {
-                write!(f, "UnexpectedOutput: {}", message)
-            }
-        }
-    }
 }
 
 /**
