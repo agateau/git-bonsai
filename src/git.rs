@@ -41,8 +41,8 @@ type GitResult<T> = Result<T, GitError>;
 pub enum GitError {
     #[error("failed to run git")]
     FailedToRunGit,
-    #[error("command exited with code {exit_code:?}")]
-    CommandFailed { exit_code: i32 },
+    #[error("command exited with code {exit_code:?}: {stderr:?}")]
+    CommandFailed { exit_code: i32, stderr: String },
     #[error("terminated by signal")]
     TerminatedBySignal,
     #[error("unexpected output: {0}")]
@@ -118,13 +118,11 @@ impl Repository {
             }
         };
         if !output.status.success() {
-            // TODO: store error message in GitError
-            println!(
-                "{}",
-                String::from_utf8(output.stderr).expect("Failed to decode command stderr")
-            );
             return match output.status.code() {
-                Some(code) => Err(GitError::CommandFailed { exit_code: code }),
+                Some(code) => Err(GitError::CommandFailed {
+                    exit_code: code,
+                    stderr: String::from_utf8_lossy(&output.stderr).into(),
+                }),
                 None => Err(GitError::TerminatedBySignal),
             };
         }
@@ -142,7 +140,7 @@ impl Repository {
         let stdout = match self.git("config", &["--get-all", key]) {
             Ok(x) => x,
             Err(x) => match x {
-                GitError::CommandFailed { exit_code: 1 } => {
+                GitError::CommandFailed { exit_code: 1, .. } => {
                     // Happens when reading a non-existing key
                     return Ok([].to_vec());
                 }
@@ -423,9 +421,12 @@ mod tests {
         let repo = create_test_repository(&tmp_dir.path());
 
         // WHEN I call find_default_branch()
-        let branch = repo.find_default_branch();
+        let err = repo.find_default_branch().unwrap_err();
 
         // THEN it fails
-        assert_eq!(branch, Err(GitError::CommandFailed { exit_code: 128 }));
+        match err {
+            GitError::CommandFailed { exit_code: 128, .. } => (),
+            e => panic!("unexpected error: {}", e),
+        };
     }
 }
