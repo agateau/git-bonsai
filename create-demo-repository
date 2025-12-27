@@ -3,6 +3,12 @@ set -euo pipefail
 
 INIT_BRANCH=main
 
+DEMO_DIR=$(cd "$(dirname "$0")" ; pwd)/demo
+REMOTE_DIR="$DEMO_DIR/remote"
+LOCAL_DIR="$DEMO_DIR/local"
+
+# Create branch $2 starting from branch $1
+# Create a file named $2 in it, add it and commit it
 create_branch() {
     local base=$1
     local branch=$2
@@ -12,31 +18,61 @@ create_branch() {
     git commit $branch -m "Create $branch"
 }
 
+# Merge branch $1 in the current branch
 merge() {
     local branch=$1
     git merge --no-ff "$branch" -m "Merging $branch"
 }
 
-rm -rf demo
-mkdir demo
-cd demo
+create_remote_repo() {
+    mkdir -p "$REMOTE_DIR"
+    git init --bare "$REMOTE_DIR"
+}
 
-git init --initial-branch=$INIT_BRANCH
-touch README
-git add README
-git commit -m "Init" README
+create_local_repo() {
+    mkdir -p "$LOCAL_DIR"
+    cd "$LOCAL_DIR"
+    git init --initial-branch=$INIT_BRANCH
+    git remote add origin "file://$REMOTE_DIR"
 
-create_branch $INIT_BRANCH topic1
-create_branch topic1 topic1-1
-create_branch $INIT_BRANCH topic2
+    touch README
+    git add README
+    git commit -m "Init" README
 
-git checkout topic1
-merge topic1-1
+    # Create this tree:
+    #
+    #       o     topic1-1
+    #      / \
+    #     o---o   topic1
+    #    /     \
+    # --o-------o $INIT_BRANCH
+    #   |\
+    #   | o       topic2
+    #    \
+    #     o       duplicate1, duplicate2
+    create_branch $INIT_BRANCH topic1
+    create_branch topic1 topic1-1
+    create_branch $INIT_BRANCH topic2
 
-git checkout $INIT_BRANCH
-merge topic1
+    git checkout topic1
+    merge topic1-1
 
-# Create two branches pointing to the same commit
-create_branch $INIT_BRANCH duplicate1
-git branch duplicate2
-git checkout $INIT_BRANCH
+    git checkout $INIT_BRANCH
+    merge topic1
+
+    # Create the duplicate* branches
+    create_branch $INIT_BRANCH duplicate1
+    git branch duplicate2
+    git checkout $INIT_BRANCH
+
+    # Create a "gone" branch (git bonsai does not do anything with them for
+    # now)
+    create_branch $INIT_BRANCH deleted-on-remote-repo
+    git push
+    git push -d origin deleted-on-remote-repo
+}
+
+rm -rf "$DEMO_DIR"
+
+create_remote_repo
+create_local_repo
