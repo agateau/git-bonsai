@@ -17,10 +17,11 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 use std::env;
-use std::fmt;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+use thiserror::Error;
 
 // Define this environment variable to print all executed git commands to stderr
 const GIT_BONSAI_DEBUG: &str = "GB_DEBUG";
@@ -34,31 +35,18 @@ const WORKTREE_BRANCH_PREFIX: &str = "+ ";
 // branch.
 pub const INITIAL_BRANCH: &str = "initial-branch";
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum GitError {
-    FailedToRunGit,
-    CommandFailed { exit_code: i32 },
-    TerminatedBySignal,
-    UnexpectedOutput(String),
-}
+type GitResult<T> = Result<T, GitError>;
 
-impl fmt::Display for GitError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            GitError::FailedToRunGit => {
-                write!(f, "Failed to run git")
-            }
-            GitError::CommandFailed { exit_code: e } => {
-                write!(f, "Command exited with code {}", e)
-            }
-            GitError::TerminatedBySignal => {
-                write!(f, "Terminated by signal")
-            }
-            GitError::UnexpectedOutput(message) => {
-                write!(f, "UnexpectedOutput: {}", message)
-            }
-        }
-    }
+#[derive(Error, Debug, PartialEq, Eq)]
+pub enum GitError {
+    #[error("failed to run git")]
+    FailedToRunGit,
+    #[error("command exited with code {exit_code:?}: {stderr:?}")]
+    CommandFailed { exit_code: i32, stderr: String },
+    #[error("terminated by signal")]
+    TerminatedBySignal,
+    #[error("unexpected output: {0}")]
+    UnexpectedOutput(String),
 }
 
 /**
@@ -100,13 +88,13 @@ impl Repository {
     }
 
     #[allow(dead_code)]
-    pub fn clone(path: &Path, url: &str) -> Result<Repository, GitError> {
+    pub fn clone(path: &Path, url: &str) -> GitResult<Repository> {
         let repo = Repository::new(path);
         repo.git("clone", &[url, path.to_str().unwrap()])?;
         Ok(repo)
     }
 
-    pub fn git(&self, subcommand: &str, args: &[&str]) -> Result<String, GitError> {
+    pub fn git(&self, subcommand: &str, args: &[&str]) -> GitResult<String> {
         let mut cmd = Command::new("git");
         cmd.current_dir(&self.path);
         cmd.env("LANG", "C");
@@ -130,13 +118,11 @@ impl Repository {
             }
         };
         if !output.status.success() {
-            // TODO: store error message in GitError
-            println!(
-                "{}",
-                String::from_utf8(output.stderr).expect("Failed to decode command stderr")
-            );
             return match output.status.code() {
-                Some(code) => Err(GitError::CommandFailed { exit_code: code }),
+                Some(code) => Err(GitError::CommandFailed {
+                    exit_code: code,
+                    stderr: String::from_utf8_lossy(&output.stderr).into(),
+                }),
                 None => Err(GitError::TerminatedBySignal),
             };
         }
@@ -144,17 +130,17 @@ impl Repository {
         Ok(out)
     }
 
-    pub fn fetch(&self) -> Result<(), GitError> {
+    pub fn fetch(&self) -> GitResult<()> {
         self.git("fetch", &["--prune"])?;
         Ok(())
     }
 
     /// Reads config keys defined with `git config --add <key> <value>`
-    pub fn get_config_keys(&self, key: &str) -> Result<Vec<String>, GitError> {
+    pub fn get_config_keys(&self, key: &str) -> GitResult<Vec<String>> {
         let stdout = match self.git("config", &["--get-all", key]) {
             Ok(x) => x,
             Err(x) => match x {
-                GitError::CommandFailed { exit_code: 1 } => {
+                GitError::CommandFailed { exit_code: 1, .. } => {
                     // Happens when reading a non-existing key
                     return Ok([].to_vec());
                 }
@@ -168,12 +154,12 @@ impl Repository {
         Ok(values)
     }
 
-    pub fn set_config_key(&self, key: &str, value: &str) -> Result<(), GitError> {
+    pub fn set_config_key(&self, key: &str, value: &str) -> GitResult<()> {
         self.git("config", &[key, value])?;
         Ok(())
     }
 
-    pub fn find_default_branch(&self) -> Result<String, GitError> {
+    pub fn find_default_branch(&self) -> GitResult<String> {
         let stdout = self.git("ls-remote", &["--symref", "origin", "HEAD"])?;
         /* Output looks like this:
          *
@@ -197,11 +183,11 @@ impl Repository {
         Ok(line.to_string())
     }
 
-    pub fn list_branches(&self) -> Result<Vec<String>, GitError> {
+    pub fn list_branches(&self) -> GitResult<Vec<String>> {
         self.list_branches_internal(&[])
     }
 
-    pub fn list_branches_with_sha1s(&self) -> Result<Vec<(String, String)>, GitError> {
+    pub fn list_branches_with_sha1s(&self) -> GitResult<Vec<(String, String)>> {
         let mut list: Vec<(String, String)> = Vec::new();
 
         let lines = self.list_branches_internal(&["-v"])?;
@@ -215,7 +201,7 @@ impl Repository {
         Ok(list)
     }
 
-    fn list_branches_internal(&self, args: &[&str]) -> Result<Vec<String>, GitError> {
+    fn list_branches_internal(&self, args: &[&str]) -> GitResult<Vec<String>> {
         let mut branches: Vec<String> = Vec::new();
 
         let stdout = self.git("branch", args)?;
@@ -230,11 +216,11 @@ impl Repository {
         Ok(branches)
     }
 
-    pub fn list_branches_containing(&self, commit: &str) -> Result<Vec<String>, GitError> {
+    pub fn list_branches_containing(&self, commit: &str) -> GitResult<Vec<String>> {
         self.list_branches_internal(&["--contains", commit])
     }
 
-    pub fn list_tracking_branches(&self) -> Result<Vec<String>, GitError> {
+    pub fn list_tracking_branches(&self) -> GitResult<Vec<String>> {
         let mut branches: Vec<String> = Vec::new();
 
         let lines = self.list_branches_internal(&["-vv"])?;
@@ -248,7 +234,7 @@ impl Repository {
         Ok(branches)
     }
 
-    pub fn checkout(&self, branch: &str) -> Result<(), GitError> {
+    pub fn checkout(&self, branch: &str) -> GitResult<()> {
         self.git("checkout", &[branch])?;
         Ok(())
     }
@@ -271,19 +257,19 @@ impl Repository {
         None
     }
 
-    pub fn update_branch(&self) -> Result<(), GitError> {
+    pub fn update_branch(&self) -> GitResult<()> {
         let out = self.git("merge", &["--ff-only"])?;
         println!("{}", out);
         Ok(())
     }
 
-    pub fn has_changes(&self) -> Result<bool, GitError> {
+    pub fn has_changes(&self) -> GitResult<bool> {
         let out = self.git("status", &["--short"])?;
         Ok(!out.is_empty())
     }
 
     #[allow(dead_code)]
-    pub fn get_current_sha1(&self) -> Result<String, GitError> {
+    pub fn get_current_sha1(&self) -> GitResult<String> {
         let out = self.git("show", &["--no-patch", "--oneline"])?;
         let sha1 = out.split(' ').next().unwrap().to_string();
         Ok(sha1)
@@ -435,9 +421,12 @@ mod tests {
         let repo = create_test_repository(&tmp_dir.path());
 
         // WHEN I call find_default_branch()
-        let branch = repo.find_default_branch();
+        let err = repo.find_default_branch().unwrap_err();
 
         // THEN it fails
-        assert_eq!(branch, Err(GitError::CommandFailed { exit_code: 128 }));
+        match err {
+            GitError::CommandFailed { exit_code: 128, .. } => (),
+            e => panic!("unexpected error: {}", e),
+        };
     }
 }

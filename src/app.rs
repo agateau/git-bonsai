@@ -18,8 +18,9 @@
  */
 use std::collections::{HashMap, HashSet};
 use std::convert::From;
-use std::fmt;
 use std::path::PathBuf;
+
+use thiserror::Error;
 
 use crate::appui::{AppUi, BranchToDeleteInfo};
 use crate::batchappui::BatchAppUi;
@@ -29,31 +30,14 @@ use crate::interactiveappui::InteractiveAppUi;
 
 pub static DEFAULT_BRANCH_CONFIG_KEY: &str = "git-bonsai.default-branch";
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum AppError {
-    Git(GitError),
+    #[error("git error")]
+    Git(#[from] GitError),
+    #[error("this branch cannot be deleted safely")]
     UnsafeDelete,
+    #[error("interrupted")]
     InterruptedByUser,
-}
-
-impl From<GitError> for AppError {
-    fn from(error: GitError) -> Self {
-        AppError::Git(error)
-    }
-}
-
-impl fmt::Display for AppError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            AppError::Git(error) => error.fmt(f),
-            AppError::UnsafeDelete => {
-                write!(f, "This branch cannot be deleted safely")
-            }
-            AppError::InterruptedByUser => {
-                write!(f, "Interrupted")
-            }
-        }
-    }
 }
 
 pub struct App {
@@ -147,14 +131,13 @@ impl App {
 
     /// Return the default branch stored in git config, if any
     pub fn get_default_branch(&self) -> Result<Option<String>, AppError> {
-        match self.repo.get_config_keys(DEFAULT_BRANCH_CONFIG_KEY) {
-            Ok(values) => Ok(if values.len() != 1 {
-                None
-            } else {
-                Some(values[0].clone())
-            }),
-            Err(x) => Err(AppError::Git(x)),
-        }
+        let values = self.repo.get_config_keys(DEFAULT_BRANCH_CONFIG_KEY)?;
+        let branch = if values.len() != 1 {
+            None
+        } else {
+            Some(values[0].clone())
+        };
+        Ok(branch)
     }
 
     pub fn fetch_changes(&self) -> Result<(), AppError> {
