@@ -25,7 +25,7 @@ use thiserror::Error;
 use crate::appui::{AppUi, BranchToDeleteInfo};
 use crate::batchappui::BatchAppUi;
 use crate::cliargs::CliArgs;
-use crate::git::{BranchRestorer, GitError, Repository};
+use crate::git::{GitError, Repository};
 use crate::interactiveappui::InteractiveAppUi;
 
 pub static DEFAULT_BRANCH_CONFIG_KEY: &str = "git-bonsai.default-branch";
@@ -404,5 +404,30 @@ pub fn run(args: CliArgs, dir: &str) -> i32 {
     match app.run() {
         Ok(()) => 0,
         Err(_) => 1,
+    }
+}
+
+/// Restores the current git branch when dropped
+/// Assumes we are on a real branch
+pub struct BranchRestorer<'a> {
+    repository: &'a Repository,
+    branch: String,
+}
+
+impl BranchRestorer<'_> {
+    pub fn new(repo: &Repository) -> BranchRestorer<'_> {
+        let current_branch = repo.get_current_branch().expect("Can't get current branch");
+        BranchRestorer {
+            repository: repo,
+            branch: current_branch,
+        }
+    }
+}
+
+impl Drop for BranchRestorer<'_> {
+    fn drop(&mut self) {
+        if let Err(_x) = self.repository.checkout(&self.branch) {
+            println!("Failed to restore original branch {}", self.branch);
+        }
     }
 }
