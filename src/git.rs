@@ -39,8 +39,8 @@ type GitResult<T> = Result<T, GitError>;
 
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum GitError {
-    #[error("failed to run git")]
-    FailedToRunGit,
+    #[error("failed to run git: {0}")]
+    FailedToRunGit(String),
     #[error("command exited with code {exit_code:?}: {stderr:?}")]
     CommandFailed { exit_code: i32, stderr: String },
     #[error("terminated by signal")]
@@ -85,9 +85,8 @@ impl Repository {
         }
         let output = match cmd.output() {
             Ok(x) => x,
-            Err(_x) => {
-                println!("Failed to execute process");
-                return Err(GitError::FailedToRunGit);
+            Err(x) => {
+                return Err(GitError::FailedToRunGit(x.to_string()));
             }
         };
         if !output.status.success() {
