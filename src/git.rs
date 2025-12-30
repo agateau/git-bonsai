@@ -16,6 +16,7 @@
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+use std::borrow::Cow;
 use std::env;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -41,10 +42,14 @@ type GitResult<T> = Result<T, GitError>;
 pub enum GitError {
     #[error("failed to run git: {0}")]
     FailedToRunGit(String),
-    #[error("command exited with code {exit_code:?}: {stderr:?}")]
-    CommandFailed { exit_code: i32, stderr: String },
-    #[error("terminated by signal")]
-    TerminatedBySignal,
+    #[error("command `{command}` exited with code {exit_code}:\n{stderr}")]
+    CommandFailed {
+        command: String,
+        exit_code: i32,
+        stderr: String,
+    },
+    #[error("command `{command}` terminated by signal")]
+    TerminatedBySignal { command: String },
     #[error("unexpected output: {0}")]
     UnexpectedOutput(String),
 }
@@ -90,12 +95,16 @@ impl Repository {
             }
         };
         if !output.status.success() {
+            let command_str = get_command_str(&cmd);
             return match output.status.code() {
                 Some(code) => Err(GitError::CommandFailed {
+                    command: command_str,
                     exit_code: code,
                     stderr: String::from_utf8_lossy(&output.stderr).into(),
                 }),
-                None => Err(GitError::TerminatedBySignal),
+                None => Err(GitError::TerminatedBySignal {
+                    command: command_str,
+                }),
             };
         }
         let out = String::from_utf8(output.stdout).expect("Failed to decode command stdout");
@@ -269,6 +278,16 @@ pub fn create_test_repository(path: &Path) -> Repository {
     repo.git("commit", &["-m", "init"]).expect("commit failed");
 
     repo
+}
+
+/// Returns a string version of command executed by [cmd]
+fn get_command_str(cmd: &Command) -> String {
+    let mut parts: Vec<Cow<'_, str>> = vec![cmd.get_program().to_string_lossy()];
+    for arg in cmd.get_args() {
+        parts.push(arg.to_string_lossy());
+    }
+    // TODO implement quoting
+    parts.join(" ")
 }
 
 #[cfg(test)]
