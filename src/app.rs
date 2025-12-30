@@ -155,7 +155,7 @@ impl App {
             }
         };
 
-        let _restorer = BranchRestorer::new(&self.repo);
+        let _restorer = BranchRestorer::new(&self.repo, self.ui.as_ref());
         for branch in branches {
             self.ui.log_info(&format!("Updating {}", branch));
             if let Err(x) = self.repo.checkout(&branch) {
@@ -409,25 +409,30 @@ pub fn run(args: CliArgs, dir: &str) -> i32 {
 
 /// Restores the current git branch when dropped
 /// Assumes we are on a real branch
-pub struct BranchRestorer<'a> {
-    repository: &'a Repository,
+pub struct BranchRestorer<'r, 'u> {
+    repository: &'r Repository,
+    ui: &'u dyn AppUi,
     branch: String,
 }
 
-impl BranchRestorer<'_> {
-    pub fn new(repo: &Repository) -> BranchRestorer<'_> {
+impl<'r, 'u> BranchRestorer<'r, 'u> {
+    pub fn new(repo: &'r Repository, ui: &'u dyn AppUi) -> BranchRestorer<'r, 'u> {
         let current_branch = repo.get_current_branch().expect("Can't get current branch");
         BranchRestorer {
             repository: repo,
+            ui,
             branch: current_branch,
         }
     }
 }
 
-impl Drop for BranchRestorer<'_> {
+impl<'r, 'u> Drop for BranchRestorer<'r, 'u> {
     fn drop(&mut self) {
         if let Err(_x) = self.repository.checkout(&self.branch) {
-            println!("Failed to restore original branch {}", self.branch);
+            self.ui.log_warning(&format!(
+                "Failed to restore original branch {}",
+                self.branch
+            ));
         }
     }
 }
