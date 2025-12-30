@@ -339,10 +339,7 @@ impl App {
             if branch_set.len() == 1 {
                 continue;
             }
-            if let Err(x) = self.do_delete_identical_branches(&sha1, &branch_set) {
-                self.ui.log_error("Failed to list branches");
-                return Err(x);
-            }
+            self.do_delete_identical_branches(&sha1, &branch_set)?;
         }
 
         Ok(())
