@@ -162,10 +162,10 @@ impl App {
                 self.ui.log_error("Failed to checkout branch");
                 return Err(AppError::Git(x));
             }
-            if let Err(_x) = self.repo.update_branch() {
-                self.ui.log_warning("Failed to update branch");
-                // This is not wrong, it can happen if the branches have diverged
-                // let's continue
+            if self.repo.fast_forward_branch().is_err() {
+                // Fast forward can fail if the branches have diverged. This is not a fatal error.
+                // Just continue with the next branch.
+                self.ui.log_warning("Can't fast-forward branch");
             }
         }
         Ok(())

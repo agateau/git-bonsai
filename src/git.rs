@@ -241,9 +241,9 @@ impl Repository {
         None
     }
 
-    pub fn update_branch(&self) -> GitResult<()> {
-        let out = self.git("merge", &["--ff-only"])?;
-        println!("{}", out);
+    /// Update the current branch to its upstream if it can be fast-forwarded
+    pub fn fast_forward_branch(&self) -> GitResult<()> {
+        self.git("merge", &["--ff-only"])?;
         Ok(())
     }
 
