@@ -182,7 +182,10 @@ impl Repository {
             if line.starts_with(WORKTREE_BRANCH_PREFIX) {
                 continue;
             }
-            let branch = line.get(2..).expect("Invalid branch name");
+            let Some(branch) = line.get(2..) else {
+                let msg = format!("invalid line in `git branch` output: {line}");
+                return Err(GitError::UnexpectedOutput(msg));
+            };
             branches.push(branch.to_string());
         }
         Ok(branches)
