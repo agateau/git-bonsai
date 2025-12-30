@@ -16,6 +16,7 @@
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+use std::borrow::Cow;
 use std::env;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -39,41 +40,18 @@ type GitResult<T> = Result<T, GitError>;
 
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum GitError {
-    #[error("failed to run git")]
-    FailedToRunGit,
-    #[error("command exited with code {exit_code:?}: {stderr:?}")]
-    CommandFailed { exit_code: i32, stderr: String },
-    #[error("terminated by signal")]
-    TerminatedBySignal,
+    #[error("failed to run git: {0}")]
+    FailedToRunGit(String),
+    #[error("command `{command}` exited with code {exit_code}:\n{stderr}")]
+    CommandFailed {
+        command: String,
+        exit_code: i32,
+        stderr: String,
+    },
+    #[error("command `{command}` terminated by signal")]
+    TerminatedBySignal { command: String },
     #[error("unexpected output: {0}")]
     UnexpectedOutput(String),
-}
-
-/**
- * Restores the current git branch when dropped
- * Assumes we are on a real branch
- */
-pub struct BranchRestorer<'a> {
-    repository: &'a Repository,
-    branch: String,
-}
-
-impl BranchRestorer<'_> {
-    pub fn new(repo: &Repository) -> BranchRestorer<'_> {
-        let current_branch = repo.get_current_branch().expect("Can't get current branch");
-        BranchRestorer {
-            repository: repo,
-            branch: current_branch,
-        }
-    }
-}
-
-impl Drop for BranchRestorer<'_> {
-    fn drop(&mut self) {
-        if let Err(_x) = self.repository.checkout(&self.branch) {
-            println!("Failed to restore original branch {}", self.branch);
-        }
-    }
 }
 
 pub struct Repository {
@@ -112,18 +90,21 @@ impl Repository {
         }
         let output = match cmd.output() {
             Ok(x) => x,
-            Err(_x) => {
-                println!("Failed to execute process");
-                return Err(GitError::FailedToRunGit);
+            Err(x) => {
+                return Err(GitError::FailedToRunGit(x.to_string()));
             }
         };
         if !output.status.success() {
+            let command_str = get_command_str(&cmd);
             return match output.status.code() {
                 Some(code) => Err(GitError::CommandFailed {
+                    command: command_str,
                     exit_code: code,
                     stderr: String::from_utf8_lossy(&output.stderr).into(),
                 }),
-                None => Err(GitError::TerminatedBySignal),
+                None => Err(GitError::TerminatedBySignal {
+                    command: command_str,
+                }),
             };
         }
         let out = String::from_utf8(output.stdout).expect("Failed to decode command stdout");
@@ -210,7 +191,10 @@ impl Repository {
             if line.starts_with(WORKTREE_BRANCH_PREFIX) {
                 continue;
             }
-            let branch = line.get(2..).expect("Invalid branch name");
+            let Some(branch) = line.get(2..) else {
+                let msg = format!("invalid line in `git branch` output: {line}");
+                return Err(GitError::UnexpectedOutput(msg));
+            };
             branches.push(branch.to_string());
         }
         Ok(branches)
@@ -257,9 +241,9 @@ impl Repository {
         None
     }
 
-    pub fn update_branch(&self) -> GitResult<()> {
-        let out = self.git("merge", &["--ff-only"])?;
-        println!("{}", out);
+    /// Update the current branch to its upstream if it can be fast-forwarded
+    pub fn fast_forward_branch(&self) -> GitResult<()> {
+        self.git("merge", &["--ff-only"])?;
         Ok(())
     }
 
@@ -294,6 +278,16 @@ pub fn create_test_repository(path: &Path) -> Repository {
     repo.git("commit", &["-m", "init"]).expect("commit failed");
 
     repo
+}
+
+/// Returns a string version of command executed by [cmd]
+fn get_command_str(cmd: &Command) -> String {
+    let mut parts: Vec<Cow<'_, str>> = vec![cmd.get_program().to_string_lossy()];
+    for arg in cmd.get_args() {
+        parts.push(arg.to_string_lossy());
+    }
+    // TODO implement quoting
+    parts.join(" ")
 }
 
 #[cfg(test)]

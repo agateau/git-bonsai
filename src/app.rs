@@ -25,14 +25,14 @@ use thiserror::Error;
 use crate::appui::{AppUi, BranchToDeleteInfo};
 use crate::batchappui::BatchAppUi;
 use crate::cliargs::CliArgs;
-use crate::git::{BranchRestorer, GitError, Repository};
+use crate::git::{GitError, Repository};
 use crate::interactiveappui::InteractiveAppUi;
 
 pub static DEFAULT_BRANCH_CONFIG_KEY: &str = "git-bonsai.default-branch";
 
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum AppError {
-    #[error("git error")]
+    #[error(transparent)]
     Git(#[from] GitError),
     #[error("this branch cannot be deleted safely")]
     UnsafeDelete,
@@ -155,17 +155,17 @@ impl App {
             }
         };
 
-        let _restorer = BranchRestorer::new(&self.repo);
+        let _restorer = BranchRestorer::new(&self.repo, self.ui.as_ref());
         for branch in branches {
             self.ui.log_info(&format!("Updating {}", branch));
             if let Err(x) = self.repo.checkout(&branch) {
                 self.ui.log_error("Failed to checkout branch");
                 return Err(AppError::Git(x));
             }
-            if let Err(_x) = self.repo.update_branch() {
-                self.ui.log_warning("Failed to update branch");
-                // This is not wrong, it can happen if the branches have diverged
-                // let's continue
+            if self.repo.fast_forward_branch().is_err() {
+                // Fast forward can fail if the branches have diverged. This is not a fatal error.
+                // Just continue with the next branch.
+                self.ui.log_warning("Can't fast-forward branch");
             }
         }
         Ok(())
@@ -339,10 +339,7 @@ impl App {
             if branch_set.len() == 1 {
                 continue;
             }
-            if let Err(x) = self.do_delete_identical_branches(&sha1, &branch_set) {
-                self.ui.log_error("Failed to list branches");
-                return Err(x);
-            }
+            self.do_delete_identical_branches(&sha1, &branch_set)?;
         }
 
         Ok(())
@@ -377,7 +374,17 @@ impl App {
         Ok(())
     }
 
-    pub fn run(&mut self) -> Result<(), AppError> {
+    pub fn run(&mut self) -> i32 {
+        match self.internal_run() {
+            Ok(()) => 0,
+            Err(err) => {
+                self.ui.log_error(&err.to_string());
+                1
+            }
+        }
+    }
+
+    fn internal_run(&mut self) -> Result<(), AppError> {
         self.add_default_branch_to_protected_branches()?;
         if self.fetch {
             self.fetch_changes()?;
@@ -401,8 +408,35 @@ pub fn run(args: CliArgs, dir: &str) -> i32 {
         return 1;
     }
 
-    match app.run() {
-        Ok(()) => 0,
-        Err(_) => 1,
+    app.run()
+}
+
+/// Restores the current git branch when dropped
+/// Assumes we are on a real branch
+pub struct BranchRestorer<'r, 'u> {
+    repository: &'r Repository,
+    ui: &'u dyn AppUi,
+    branch: String,
+}
+
+impl<'r, 'u> BranchRestorer<'r, 'u> {
+    pub fn new(repo: &'r Repository, ui: &'u dyn AppUi) -> BranchRestorer<'r, 'u> {
+        let current_branch = repo.get_current_branch().expect("Can't get current branch");
+        BranchRestorer {
+            repository: repo,
+            ui,
+            branch: current_branch,
+        }
+    }
+}
+
+impl<'r, 'u> Drop for BranchRestorer<'r, 'u> {
+    fn drop(&mut self) {
+        if let Err(_x) = self.repository.checkout(&self.branch) {
+            self.ui.log_warning(&format!(
+                "Failed to restore original branch {}",
+                self.branch
+            ));
+        }
     }
 }
