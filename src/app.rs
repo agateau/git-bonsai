@@ -32,7 +32,7 @@ pub static DEFAULT_BRANCH_CONFIG_KEY: &str = "git-bonsai.default-branch";
 
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum AppError {
-    #[error("git error")]
+    #[error(transparent)]
     Git(#[from] GitError),
     #[error("this branch cannot be deleted safely")]
     UnsafeDelete,
