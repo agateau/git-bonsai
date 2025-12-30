@@ -377,7 +377,17 @@ impl App {
         Ok(())
     }
 
-    pub fn run(&mut self) -> Result<(), AppError> {
+    pub fn run(&mut self) -> i32 {
+        match self.internal_run() {
+            Ok(()) => 0,
+            Err(err) => {
+                self.ui.log_error(&err.to_string());
+                1
+            }
+        }
+    }
+
+    fn internal_run(&mut self) -> Result<(), AppError> {
         self.add_default_branch_to_protected_branches()?;
         if self.fetch {
             self.fetch_changes()?;
@@ -401,10 +411,7 @@ pub fn run(args: CliArgs, dir: &str) -> i32 {
         return 1;
     }
 
-    match app.run() {
-        Ok(()) => 0,
-        Err(_) => 1,
-    }
+    app.run()
 }
 
 /// Restores the current git branch when dropped
