@@ -118,7 +118,10 @@ impl App {
 
     /// Ask the user the name of the default branch, and store the result in git config
     pub fn find_default_branch_from_user(&self) -> Result<String, AppError> {
-        let branch = match self.ui.select_default_branch(&self.repo.list_branches()?) {
+        let branch = match self
+            .ui
+            .select_default_branch(&self.repo.list_branch_names()?)
+        {
             Some(x) => x,
             None => {
                 return Err(AppError::InterruptedByUser);
@@ -225,7 +228,7 @@ impl App {
     }
 
     fn get_deletable_branches(&self) -> Result<Vec<BranchToDeleteInfo>, AppError> {
-        let deletable_branches: Vec<BranchToDeleteInfo> = match self.repo.list_branches() {
+        let deletable_branches: Vec<BranchToDeleteInfo> = match self.repo.list_branch_names() {
             Ok(x) => x,
             Err(x) => {
                 self.ui.log_error("Failed to list branches");

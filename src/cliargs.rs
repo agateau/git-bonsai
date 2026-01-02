@@ -35,4 +35,8 @@ pub struct CliArgs {
     /// Do not ask for confirmation
     #[structopt(short = "y", long = "yes")]
     pub yes: bool,
+
+    /// Use ratatui UI
+    #[structopt(short = "r", long = "ratatui")]
+    pub ratatui: bool,
 }

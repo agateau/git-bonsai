@@ -24,11 +24,16 @@ mod batchappui;
 mod cliargs;
 mod git;
 mod interactiveappui;
+mod ratapp;
 mod tui;
 
 use cliargs::CliArgs;
 
 fn main() {
     let args = CliArgs::from_args();
-    ::std::process::exit(app::run(args, "."));
+    if args.ratatui {
+        ::std::process::exit(ratapp::run(args, "."));
+    } else {
+        ::std::process::exit(app::run(args, "."));
+    }
 }

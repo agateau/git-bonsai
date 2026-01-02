@@ -83,7 +83,7 @@ mod integ {
 
     macro_rules! assert_branches_eq {
         ($repo:expr, $expected_branches:expr) => {
-            let branches = $repo.list_branches().unwrap();
+            let branches = $repo.list_branch_names().unwrap();
             assert_eq!(branches, $expected_branches);
         };
     }
@@ -251,7 +251,7 @@ mod integ {
         assert_eq!(result, Ok(()));
 
         // AND only the main branch remains
-        assert_eq!(repo.list_branches().unwrap(), &[INITIAL_BRANCH]);
+        assert_eq!(repo.list_branch_names().unwrap(), &[INITIAL_BRANCH]);
     }
 
     #[test]
@@ -269,7 +269,7 @@ mod integ {
         assert_eq!(result, Err(AppError::UnsafeDelete));
 
         // AND the test branch still exists
-        assert_eq!(repo.list_branches().unwrap(), &[INITIAL_BRANCH, "test"]);
+        assert_eq!(repo.list_branch_names().unwrap(), &[INITIAL_BRANCH, "test"]);
     }
 
     #[test]

@@ -36,7 +36,15 @@ const WORKTREE_BRANCH_PREFIX: &str = "+ ";
 // branch.
 pub const INITIAL_BRANCH: &str = "initial-branch";
 
-type GitResult<T> = Result<T, GitError>;
+const GIT_BRANCH_CMD_FIELDS: [&str; 5] = [
+    "refname:short",
+    "upstream:short",
+    "upstream:track,nobracket",
+    "worktreepath",
+    "committerdate",
+];
+
+pub type GitResult<T> = Result<T, GitError>;
 
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum GitError {
@@ -54,6 +62,60 @@ pub enum GitError {
     UnexpectedOutput(String),
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Branch {
+    pub name: String,
+    pub checkout_state: CheckoutState,
+    pub last_commit_date: String, // FIXME: use a proper date format
+    //pub status: SyncStatus,
+    pub upstream: Option<Upstream>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CheckoutState {
+    NotCheckedOut,
+    Current,
+    WorkTree,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Upstream {
+    pub name: String,
+    pub ahead_behind: Option<AheadBehind>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AheadBehindStatus {
+    UpToDate,
+    Diverged,
+    Ahead,
+    Behind,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AheadBehind {
+    ahead: u32,
+    behind: u32,
+}
+
+impl AheadBehind {
+    fn new(ahead: u32, behind: u32) -> Self {
+        Self { ahead, behind }
+    }
+
+    pub fn status(&self) -> AheadBehindStatus {
+        if self.ahead == 0 && self.behind == 0 {
+            AheadBehindStatus::UpToDate
+        } else if self.ahead == 0 {
+            AheadBehindStatus::Behind
+        } else if self.behind == 0 {
+            AheadBehindStatus::Ahead
+        } else {
+            AheadBehindStatus::Diverged
+        }
+    }
+}
+
 pub struct Repository {
     pub path: PathBuf,
 }
@@ -61,7 +123,7 @@ pub struct Repository {
 impl Repository {
     pub fn new(path: &Path) -> Repository {
         Repository {
-            path: path.to_path_buf(),
+            path: path.to_path_buf().canonicalize().unwrap(),
         }
     }
 
@@ -164,7 +226,7 @@ impl Repository {
         Ok(line.to_string())
     }
 
-    pub fn list_branches(&self) -> GitResult<Vec<String>> {
+    pub fn list_branch_names(&self) -> GitResult<Vec<String>> {
         self.list_branches_internal(&[])
     }
 
@@ -218,6 +280,23 @@ impl Repository {
         Ok(branches)
     }
 
+    pub fn list_branches(&self) -> GitResult<Vec<Branch>> {
+        // Create a 0-separated format arg
+        let format_arg = GIT_BRANCH_CMD_FIELDS
+            .iter()
+            .map(|x| format!("%({x})"))
+            .collect::<Vec<_>>()
+            .join("%00");
+        let stdout = self.git("branch", &["--format", &format_arg])?;
+
+        let mut branches: Vec<Branch> = vec![];
+        for line in stdout.lines() {
+            let branch = parse_git_branch_line(line, &self.path)?;
+            branches.push(branch);
+        }
+        Ok(branches)
+    }
+
     pub fn checkout(&self, branch: &str) -> GitResult<()> {
         self.git("checkout", &[branch])?;
         Ok(())
@@ -260,6 +339,81 @@ impl Repository {
     }
 }
 
+/// Parse the value returned by the upstream:track,nobracket field
+fn parse_upstream_track_field(field: &str) -> GitResult<Option<AheadBehind>> {
+    if field == "gone" {
+        return Ok(None);
+    }
+    if field.is_empty() {
+        return Ok(Some(AheadBehind::new(0, 0)));
+    }
+    let mut ahead_behind = AheadBehind::new(0, 0);
+    let tokens: Vec<_> = field.split(", ").collect();
+
+    let create_error = || {
+        let msg = format!("failed to parse upstream:track field: `{field}`");
+        GitError::UnexpectedOutput(msg)
+    };
+
+    for token in tokens {
+        let sub_tokens: Vec<_> = token.split(" ").collect();
+        match sub_tokens[..] {
+            ["ahead", value_str] => {
+                ahead_behind.ahead = value_str.parse().map_err(|_| create_error())?;
+            }
+            ["behind", value_str] => {
+                ahead_behind.behind = value_str.parse().map_err(|_| create_error())?;
+            }
+            _ => {
+                return Err(create_error());
+            }
+        };
+    }
+    Ok(Some(ahead_behind))
+}
+
+/// Parse a line returned by `git branch --format $FORMAT`, where $FORMAT is defined
+/// by `GIT_BRANCH_CMD_FIELDS`
+fn parse_git_branch_line(line: &str, repo_path: &Path) -> GitResult<Branch> {
+    let tokens: Vec<_> = line.split("\0").collect();
+
+    let [refname, upstream_str, track_str, worktree, commit_date_str] = tokens[..] else {
+        let msg = format!(
+            "Unexpected number of tokens in `{line}`. Expected {} got {}",
+            GIT_BRANCH_CMD_FIELDS.len(),
+            tokens.len()
+        );
+        return Err(GitError::UnexpectedOutput(msg));
+    };
+
+    let upstream: Option<Upstream> = if upstream_str.is_empty() {
+        None
+    } else {
+        Some(Upstream {
+            name: upstream_str.into(),
+            ahead_behind: parse_upstream_track_field(track_str)?,
+        })
+    };
+
+    let checkout_state = {
+        let worktree_path = Path::new(worktree);
+        if worktree.is_empty() {
+            CheckoutState::NotCheckedOut
+        } else if repo_path.ancestors().any(|x| x == worktree_path) {
+            CheckoutState::Current
+        } else {
+            CheckoutState::WorkTree
+        }
+    };
+
+    Ok(Branch {
+        name: refname.into(),
+        checkout_state,
+        upstream,
+        last_commit_date: commit_date_str.into(),
+    })
+}
+
 // Used by test code
 #[allow(dead_code)]
 pub fn create_test_repository(path: &Path) -> Repository {
@@ -295,6 +449,9 @@ mod tests {
     extern crate assert_fs;
 
     use super::*;
+
+    use yare::parameterized;
+
     use std::fs;
 
     #[test]
@@ -330,7 +487,7 @@ mod tests {
         assert_eq!(result, Ok(()));
 
         // AND only the main branch remains
-        assert_eq!(repo.list_branches().unwrap(), &[INITIAL_BRANCH]);
+        assert_eq!(repo.list_branch_names().unwrap(), &[INITIAL_BRANCH]);
     }
 
     #[test]
@@ -359,7 +516,7 @@ mod tests {
     }
 
     #[test]
-    fn list_branches_skip_worktree_branches() {
+    fn list_branch_names_skip_worktree_branches() {
         // GIVEN a source repository with two branches
         let tmp_dir = assert_fs::TempDir::new().unwrap();
 
@@ -381,7 +538,7 @@ mod tests {
             .unwrap();
 
         // WHEN I list branches
-        let branches = clone_repo.list_branches().unwrap();
+        let branches = clone_repo.list_branch_names().unwrap();
 
         // THEN it does not list worktree branches
         assert_eq!(branches.len(), 1);
@@ -422,5 +579,43 @@ mod tests {
             GitError::CommandFailed { exit_code: 128, .. } => (),
             e => panic!("unexpected error: {}", e),
         };
+    }
+
+    #[test]
+    fn parse_simple_git_branch_line() {
+        let tokens = vec![
+            "master",
+            "origin/master",
+            "ahead 2, behind 4",
+            "",
+            "Tue Dec 30 23:23:09 2025 +0100",
+        ];
+        assert_eq!(tokens.len(), GIT_BRANCH_CMD_FIELDS.len());
+        let line = tokens.join("\x00");
+        let branch = parse_git_branch_line(&line, Path::new(".")).unwrap();
+        assert_eq!(
+            branch,
+            Branch {
+                name: "master".into(),
+                checkout_state: CheckoutState::NotCheckedOut,
+                last_commit_date: "Tue Dec 30 23:23:09 2025 +0100".into(),
+                upstream: Some(Upstream {
+                    name: "origin/master".into(),
+                    ahead_behind: Some(AheadBehind::new(2, 4)),
+                }),
+            }
+        );
+    }
+
+    #[parameterized(
+        gone = { "gone", None },
+        ahead = { "ahead 23", Some(AheadBehind::new(23, 0)) },
+        behind = { "behind 34", Some(AheadBehind::new(0, 34)) },
+        diverged = { "ahead 45, behind 56", Some(AheadBehind::new(45, 56)) },
+        up_to_date  = { "", Some(AheadBehind::new(0, 0)) },
+    )]
+    fn test_parse_upstream_track_field(field: &str, expected: Option<AheadBehind>) {
+        let result = parse_upstream_track_field(field).unwrap();
+        assert_eq!(result, expected);
     }
 }
