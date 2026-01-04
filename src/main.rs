@@ -27,6 +27,7 @@ mod interactiveappui;
 mod popup;
 mod ratapp;
 mod tui;
+mod uiutils;
 
 use cliargs::CliArgs;
 

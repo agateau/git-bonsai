@@ -18,6 +18,7 @@ use crate::git::{
     AheadBehind, AheadBehindStatus, Branch, CheckoutState, GitResult, Repository, Upstream,
 };
 use crate::popup::Popup;
+use crate::uiutils::{self, DIM_STYLE};
 
 trait Action {
     fn name(&self) -> &str;
@@ -91,9 +92,12 @@ fn get_ahead_behind_str(ahead_behind: &Option<AheadBehind>) -> &'static str {
     }
 }
 
+/// Global state of the application
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum ModelState {
+    /// Default state, showing branches
     Normal,
+    /// Showing an error message
     Error(String),
 }
 
@@ -237,32 +241,31 @@ impl App {
     }
 
     fn render_toolbar(&mut self, frame: &mut Frame, area: Rect) {
-        let dim_style = Style::new().dark_gray();
-        let text_style = Style::new();
-        let shortcut_style = Style::new().yellow();
-
         let spans: Vec<Span> = self
             .actions
             .iter()
             .flat_map(|x| {
                 let enabled = x.is_enabled(&self.model);
-
-                let action_spans: Vec<Span> = vec![
-                    Span::styled("[", dim_style),
-                    Span::styled(x.name(), if enabled { text_style } else { dim_style }),
-                    Span::styled(" (", dim_style),
-                    Span::styled(
-                        format!("{}", x.keycode()),
-                        if enabled { shortcut_style } else { dim_style },
-                    ),
-                    Span::styled(")] ", dim_style),
-                ];
+                let mut action_spans = uiutils::create_action_spans(x.name(), x.keycode(), enabled);
+                action_spans.push(Span::styled("─", DIM_STYLE));
                 action_spans
             })
             .collect();
 
         let toolbar = Line::from(spans);
+        let toolbar_end = toolbar.width() as u16;
         frame.render_widget(toolbar, area);
+
+        let padding = area.width - toolbar_end;
+        frame.render_widget(
+            Line::styled("─".repeat(padding as usize), DIM_STYLE),
+            Rect {
+                x: toolbar_end,
+                y: area.y,
+                width: padding,
+                height: 1,
+            },
+        );
     }
 
     fn render_error_message(&mut self, frame: &mut Frame) {

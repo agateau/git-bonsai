@@ -25,3 +25,4 @@ pub mod interactiveappui;
 pub mod popup;
 pub mod ratapp;
 pub mod tui;
+pub mod uiutils;
