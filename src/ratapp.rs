@@ -9,7 +9,7 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::Style;
-use ratatui::text::{Line, Span};
+use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Row, Table, TableState};
 use ratatui::Frame;
 
@@ -17,6 +17,7 @@ use crate::cliargs::CliArgs;
 use crate::git::{
     AheadBehind, AheadBehindStatus, Branch, CheckoutState, GitResult, Repository, Upstream,
 };
+use crate::popup::Popup;
 
 trait Action {
     fn name(&self) -> &str;
@@ -64,7 +65,9 @@ impl Action for CheckoutAction {
     }
 
     fn trigger(&self, model: &mut Model) {
-        model.checkout();
+        if let Err(error) = model.checkout() {
+            model.model_state = ModelState::Error(format!("{}", error));
+        }
     }
 }
 
@@ -88,11 +91,18 @@ fn get_ahead_behind_str(ahead_behind: &Option<AheadBehind>) -> &'static str {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ModelState {
+    Normal,
+    Error(String),
+}
+
 struct Model {
     path: PathBuf,
     table_state: TableState,
     branches: Vec<Branch>,
     exit: bool,
+    model_state: ModelState,
 }
 
 impl Model {
@@ -134,11 +144,15 @@ impl Model {
         };
     }
 
-    fn checkout(&mut self) {
+    fn checkout(&mut self) -> GitResult<()> {
         let repo = Repository::new(&self.path);
-        let name = &self.current_branch().unwrap().name; // FIXME
-        repo.checkout(name).unwrap(); // FIXME
-        self.update_branches().unwrap(); // FIXME
+        let name = &self
+            .current_branch()
+            .expect("checkout should not be callable without an active branch")
+            .name;
+        repo.checkout(name)?;
+        self.update_branches()?;
+        Ok(())
     }
 }
 
@@ -156,6 +170,7 @@ impl App {
                 table_state: TableState::default(),
                 branches: vec![],
                 exit: false,
+                model_state: ModelState::Normal,
             },
         }
     }
@@ -250,11 +265,29 @@ impl App {
         frame.render_widget(toolbar, area);
     }
 
+    fn render_error_message(&mut self, frame: &mut Frame) {
+        let ModelState::Error(ref error) = self.model.model_state else {
+            return;
+        };
+        let popup = Popup::default().title("Error").content(Text::raw(error));
+
+        let frame_area = frame.area();
+        let area = Rect {
+            x: frame_area.width / 3,
+            y: frame_area.height / 4,
+            width: frame_area.width / 3,
+            height: frame_area.height / 4,
+        };
+
+        frame.render_widget(popup, area);
+    }
+
     fn draw(&mut self, frame: &mut Frame) {
         let [content, footer] =
             Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(frame.area());
 
         self.render_branch_table(frame, content);
+        self.render_error_message(frame);
         self.render_toolbar(frame, footer);
     }
 
@@ -269,6 +302,10 @@ impl App {
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
+        if matches!(self.model.model_state, ModelState::Error(_)) {
+            self.handle_error_key_event(key_event);
+            return;
+        }
         for action in &self.actions {
             if action.keycode() == key_event.code {
                 if action.is_enabled(&self.model) {
@@ -281,6 +318,12 @@ impl App {
             KeyCode::Up => self.model.move_up(),
             KeyCode::Down => self.model.move_down(),
             _ => {}
+        }
+    }
+
+    fn handle_error_key_event(&mut self, key_event: KeyEvent) {
+        if matches!(key_event.code, KeyCode::Esc | KeyCode::Char('q')) {
+            self.model.model_state = ModelState::Normal;
         }
     }
 }

@@ -24,6 +24,7 @@ mod batchappui;
 mod cliargs;
 mod git;
 mod interactiveappui;
+mod popup;
 mod ratapp;
 mod tui;
 

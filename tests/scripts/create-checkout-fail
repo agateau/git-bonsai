@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Create a repository with changes that causes checkout to fail
+rm -rf testrepo
+mkdir testrepo
+cd testrepo
+
+# Create an empty repository
+git init --initial-branch main
+git commit -m "Init" --allow-empty
+
+# Create a branch and add an "hello" file to it
+git checkout -b work
+echo "Hello" > hello
+git add hello
+git commit -m "Hello"
+
+# Switch back to main and create another "hello" file
+git checkout main
+echo "Hello" > hello
+
+# Verify switching back to the work branch fails
+if git checkout work ; then
+    echo "Error: switching to the work branch should not have worked"
+    exit 1
+fi

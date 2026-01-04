@@ -19,6 +19,7 @@ console = "0.16.2"
 thiserror = "2.0.17"
 crossterm = "0.29.0"
 ratatui = "0.30.0"
+derive_setters = "0.1.8"
 
 [dev-dependencies]
 assert_fs = "1.0.7"
