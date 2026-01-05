@@ -16,6 +16,7 @@
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+pub mod action;
 pub mod app;
 pub mod appui;
 pub mod batchappui;
@@ -25,4 +26,3 @@ pub mod interactiveappui;
 pub mod popup;
 pub mod ratapp;
 pub mod tui;
-pub mod uiutils;

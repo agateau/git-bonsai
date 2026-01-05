@@ -13,64 +13,12 @@ use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Row, Table, TableState};
 use ratatui::Frame;
 
+use crate::action::{Action, DIM_STYLE};
 use crate::cliargs::CliArgs;
 use crate::git::{
     AheadBehind, AheadBehindStatus, Branch, CheckoutState, GitResult, Repository, Upstream,
 };
 use crate::popup::Popup;
-use crate::uiutils::{self, DIM_STYLE};
-
-trait Action {
-    fn name(&self) -> &str;
-    fn keycode(&self) -> KeyCode;
-    fn is_enabled(&self, model: &Model) -> bool;
-    fn trigger(&self, model: &mut Model);
-}
-
-#[derive(Default)]
-struct QuitAction;
-
-impl Action for QuitAction {
-    fn name(&self) -> &str {
-        "Quit"
-    }
-
-    fn keycode(&self) -> KeyCode {
-        KeyCode::Char('q')
-    }
-
-    fn is_enabled(&self, _model: &Model) -> bool {
-        true
-    }
-
-    fn trigger(&self, model: &mut Model) {
-        model.exit = true;
-    }
-}
-
-#[derive(Default)]
-struct CheckoutAction;
-
-impl Action for CheckoutAction {
-    fn name(&self) -> &str {
-        "Checkout"
-    }
-
-    fn keycode(&self) -> KeyCode {
-        KeyCode::Char('c')
-    }
-
-    fn is_enabled(&self, model: &Model) -> bool {
-        let branch = model.current_branch();
-        branch.is_some_and(|x| x.checkout_state == CheckoutState::NotCheckedOut)
-    }
-
-    fn trigger(&self, model: &mut Model) {
-        if let Err(error) = model.checkout() {
-            model.model_state = ModelState::Error(format!("{}", error));
-        }
-    }
-}
 
 const EMPTY_STR: &str = "";
 
@@ -90,6 +38,13 @@ fn get_ahead_behind_str(ahead_behind: &Option<AheadBehind>) -> &'static str {
         AheadBehindStatus::Ahead => AB_AHEAD,
         AheadBehindStatus::Diverged => AB_DIVERGED,
     }
+}
+
+#[derive(Debug)]
+pub enum Command {
+    Checkout,
+    Quit,
+    ClosePopup,
 }
 
 /// Global state of the application
@@ -148,27 +103,51 @@ impl Model {
         };
     }
 
-    fn checkout(&mut self) -> GitResult<()> {
+    fn checkout(&mut self) {
         let repo = Repository::new(&self.path);
         let name = &self
             .current_branch()
             .expect("checkout should not be callable without an active branch")
             .name;
-        repo.checkout(name)?;
-        self.update_branches()?;
-        Ok(())
+        if let Err(error) = repo.checkout(name) {
+            self.model_state = ModelState::Error(format!("{}", error));
+            return;
+        }
+        self.update_branches()
+            .expect("update_branches() should not fail after a successful checkout");
+    }
+
+    fn quit(&mut self) {
+        self.exit = true;
     }
 }
 
 struct App {
-    actions: Vec<Box<dyn Action>>,
+    actions: Vec<Action<Command>>,
+    checkout_action_idx: usize,
+    close_popup_action: Action<Command>,
     model: Model,
 }
 
 impl App {
     fn new(_cli_args: CliArgs, path: &Path) -> Self {
+        let mut actions: Vec<Action<Command>> = vec![];
+        actions.push(Action::new(
+            "Checkout".into(),
+            KeyCode::Char('c'),
+            Command::Checkout,
+        ));
+        let checkout_action_idx = actions.len();
+        actions.push(Action::new(
+            "Quit".into(),
+            KeyCode::Char('q'),
+            Command::Quit,
+        ));
+        let close_popup_action = Action::new("Close".into(), KeyCode::Esc, Command::ClosePopup);
         Self {
-            actions: vec![Box::new(CheckoutAction), Box::new(QuitAction)],
+            actions,
+            checkout_action_idx,
+            close_popup_action,
             model: Model {
                 path: path.into(),
                 table_state: TableState::default(),
@@ -188,10 +167,17 @@ impl App {
         }
         let mut terminal = ratatui::init();
         while !self.model.exit {
+            self.update();
             terminal.draw(|frame| self.draw(frame))?;
             self.handle_events()?;
         }
         Ok(())
+    }
+
+    fn update(&mut self) {
+        let branch = self.model.current_branch();
+        let can_checkout = branch.is_some_and(|x| x.checkout_state == CheckoutState::NotCheckedOut);
+        self.actions[self.checkout_action_idx].enabled = can_checkout;
     }
 
     fn render_branch_table(&mut self, frame: &mut Frame, area: Rect) {
@@ -245,8 +231,7 @@ impl App {
             .actions
             .iter()
             .flat_map(|x| {
-                let enabled = x.is_enabled(&self.model);
-                let mut action_spans = uiutils::create_action_spans(x.name(), x.keycode(), enabled);
+                let mut action_spans = x.create_spans();
                 action_spans.push(Span::styled("─", DIM_STYLE));
                 action_spans
             })
@@ -272,7 +257,9 @@ impl App {
         let ModelState::Error(ref error) = self.model.model_state else {
             return;
         };
-        let popup = Popup::default().title("Error").content(Text::raw(error));
+        let popup = Popup::new(&self.close_popup_action)
+            .title("Error")
+            .content(Text::raw(error));
 
         let frame_area = frame.area();
         let area = Rect {
@@ -310,9 +297,13 @@ impl App {
             return;
         }
         for action in &self.actions {
-            if action.keycode() == key_event.code {
-                if action.is_enabled(&self.model) {
-                    action.trigger(&mut self.model);
+            if action.keycode == key_event.code {
+                if action.enabled {
+                    match action.command {
+                        Command::Checkout => self.model.checkout(),
+                        Command::Quit => self.model.quit(),
+                        _ => panic!("Unexpected command: {:?}", action.command),
+                    }
                 }
                 return;
             }
@@ -325,7 +316,7 @@ impl App {
     }
 
     fn handle_error_key_event(&mut self, key_event: KeyEvent) {
-        if matches!(key_event.code, KeyCode::Esc | KeyCode::Char('q')) {
+        if self.close_popup_action.keycode == key_event.code {
             self.model.model_state = ModelState::Normal;
         }
     }

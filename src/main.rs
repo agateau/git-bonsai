@@ -18,6 +18,7 @@
  */
 use structopt::StructOpt;
 
+mod action;
 mod app;
 mod appui;
 mod batchappui;
@@ -27,7 +28,6 @@ mod interactiveappui;
 mod popup;
 mod ratapp;
 mod tui;
-mod uiutils;
 
 use cliargs::CliArgs;
 
