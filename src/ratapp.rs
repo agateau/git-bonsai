@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use std::io;
 use std::path::{Path, PathBuf};
+use std::{cmp, io};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 
@@ -67,6 +67,7 @@ struct Model {
     table_state: TableState,
     branches: Vec<Branch>,
     app_state: AppState,
+    page_size: usize,
 }
 
 impl Model {
@@ -102,6 +103,7 @@ impl Model {
             table_state: TableState::default(),
             branches: vec![],
             app_state: AppState::Normal,
+            page_size: 10,
         }
     }
 
@@ -145,6 +147,26 @@ impl Model {
                 } else {
                     0
                 };
+                self.table_state.select(Some(x));
+            }
+            None => self.table_state.select(Some(0)),
+        };
+    }
+
+    fn page_up(&mut self) {
+        match self.table_state.selected() {
+            Some(x) => {
+                self.table_state
+                    .select(Some(x.saturating_sub(self.page_size)));
+            }
+            None => self.table_state.select(Some(0)),
+        };
+    }
+
+    fn page_down(&mut self) {
+        match self.table_state.selected() {
+            Some(x) => {
+                let x = cmp::min(x + self.page_size, self.branches.len() - 1);
                 self.table_state.select(Some(x));
             }
             None => self.table_state.select(Some(0)),
@@ -260,6 +282,8 @@ impl App {
             )
             .row_highlight_style(Style::new().reversed());
 
+        self.model.page_size = (area.height - 1) as usize;
+
         frame.render_stateful_widget(table, area, &mut self.model.table_state);
     }
 
@@ -350,6 +374,8 @@ impl App {
         match key_event.code {
             KeyCode::Up => self.model.move_up(),
             KeyCode::Down => self.model.move_down(),
+            KeyCode::PageUp => self.model.page_up(),
+            KeyCode::PageDown => self.model.page_down(),
             _ => {}
         }
     }

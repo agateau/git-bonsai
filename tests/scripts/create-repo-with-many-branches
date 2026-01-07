@@ -1,0 +1,49 @@
+#!/usr/bin/env python
+from pathlib import Path
+import random
+import re
+import shutil
+import subprocess
+
+SCRIPT_DIR = Path(__file__).parent
+
+
+class Repository:
+    def __init__(self, path: Path) -> None:
+        self.path = path
+
+    def init(self) -> None:
+        self.run("init", "--initial-branch", "main")
+        self.run("commit", "-m", "Init", "--allow-empty")
+
+    def run(self, *args) -> None:
+        subprocess.run(["git", *args], check=True, cwd=self.path)
+
+
+def get_word_list() -> list[str]:
+    src_path = SCRIPT_DIR / "../../LICENSE"
+    text = src_path.read_text()
+    words = set(re.findall("[a-zA-Z0-9]+", text))
+    return list(words)
+
+
+def main():
+    words = get_word_list()
+    print(f"Word list contains {len(words)} words")
+
+    repo_path = Path("testrepo")
+    if repo_path.exists():
+        shutil.rmtree(repo_path)
+    repo_path.mkdir()
+    repo = Repository(repo_path)
+    repo.init()
+
+    # Create branches
+    for _ in range(200):
+        idx = random.randrange(0, len(words))
+        name = words.pop(idx)
+        repo.run("checkout", "-b", name, "--quiet")
+
+
+if __name__ == "__main__":
+    main()
