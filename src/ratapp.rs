@@ -43,6 +43,7 @@ fn get_ahead_behind_str(ahead_behind: &Option<AheadBehind>) -> &'static str {
 #[derive(Debug)]
 pub enum Command {
     Checkout,
+    Delete,
     Quit,
     ClosePopup,
 }
@@ -60,6 +61,7 @@ enum AppState {
 struct Model {
     actions: Vec<Action<Command>>,
     checkout_action_idx: usize,
+    delete_action_idx: usize,
     close_popup_action: Action<Command>,
     path: PathBuf,
     table_state: TableState,
@@ -70,12 +72,21 @@ struct Model {
 impl Model {
     fn new(path: &Path) -> Self {
         let mut actions: Vec<Action<Command>> = vec![];
+
+        let checkout_action_idx = actions.len();
         actions.push(Action::new(
             "Checkout".into(),
             KeyCode::Char('c'),
             Command::Checkout,
         ));
-        let checkout_action_idx = actions.len();
+
+        let delete_action_idx = actions.len();
+        actions.push(Action::new(
+            "Delete".into(),
+            KeyCode::Char('d'),
+            Command::Delete,
+        ));
+
         actions.push(Action::new(
             "Quit".into(),
             KeyCode::Char('q'),
@@ -85,6 +96,7 @@ impl Model {
         Self {
             actions,
             checkout_action_idx,
+            delete_action_idx,
             close_popup_action,
             path: path.into(),
             table_state: TableState::default(),
@@ -95,8 +107,10 @@ impl Model {
 
     fn update(&mut self) {
         let branch = self.current_branch();
-        let can_checkout = branch.is_some_and(|x| x.checkout_state == CheckoutState::NotCheckedOut);
-        self.actions[self.checkout_action_idx].enabled = can_checkout;
+        let is_not_checked_out =
+            branch.is_some_and(|x| x.checkout_state == CheckoutState::NotCheckedOut);
+        self.actions[self.checkout_action_idx].enabled = is_not_checked_out;
+        self.actions[self.delete_action_idx].enabled = is_not_checked_out;
     }
 
     fn update_branches(&mut self) -> GitResult<()> {
@@ -141,7 +155,7 @@ impl Model {
         let repo = Repository::new(&self.path);
         let name = &self
             .current_branch()
-            .expect("checkout should not be callable without an active branch")
+            .expect("checkout() should not be callable without an active branch")
             .name;
         if let Err(error) = repo.checkout(name) {
             self.app_state = AppState::Error(format!("{}", error));
@@ -153,6 +167,21 @@ impl Model {
 
     fn quit(&mut self) {
         self.app_state = AppState::Exiting;
+    }
+
+    fn delete(&mut self) {
+        let repo = Repository::new(&self.path);
+        let name = &self
+            .current_branch()
+            .expect("delete() should not be callable without an active branch")
+            .name;
+        // TODO show confirmation popup if deleting the branch is not safe
+        if let Err(error) = repo.delete_branch(name) {
+            self.app_state = AppState::Error(format!("{}", error));
+            return;
+        }
+        self.update_branches()
+            .expect("update_branches() should not fail after a successful delete");
     }
 }
 
@@ -306,6 +335,7 @@ impl App {
                     match action.command {
                         Command::Checkout => self.model.checkout(),
                         Command::Quit => self.model.quit(),
+                        Command::Delete => self.model.delete(),
                         _ => panic!("Unexpected command: {:?}", action.command),
                     }
                 }
