@@ -240,11 +240,16 @@ impl App {
             .collect();
 
         let widths = [
+            // Checkout state
             Constraint::Length(1),
-            Constraint::Length(25),
-            Constraint::Length(35),
-            Constraint::Length(20),
-            Constraint::Length(25),
+            // Name
+            Constraint::Fill(1),
+            // Last commit
+            Constraint::Length(30),
+            // Status
+            Constraint::Length(10),
+            // Upstream
+            Constraint::Fill(1),
         ];
 
         let table = Table::new(rows, widths)
