@@ -2,22 +2,21 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use std::path::{Path, PathBuf};
-use std::{cmp, io};
+use std::io;
+use std::path::Path;
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span, Text};
-use ratatui::widgets::{Row, Table, TableState};
+use ratatui::widgets::{Row, Table};
 use ratatui::Frame;
 
-use crate::action::{Action, DIM_STYLE};
+use crate::action::DIM_STYLE;
 use crate::cliargs::CliArgs;
-use crate::git::{
-    AheadBehind, AheadBehindStatus, Branch, CheckoutState, GitResult, Repository, Upstream,
-};
+use crate::git::{AheadBehind, AheadBehindStatus, CheckoutState, Upstream};
+use crate::model::{AppState, Command, Model};
 use crate::popup::Popup;
 
 const EMPTY_STR: &str = "";
@@ -37,173 +36,6 @@ fn get_ahead_behind_str(ahead_behind: &Option<AheadBehind>) -> &'static str {
         AheadBehindStatus::Behind => AB_BEHIND,
         AheadBehindStatus::Ahead => AB_AHEAD,
         AheadBehindStatus::Diverged => AB_DIVERGED,
-    }
-}
-
-#[derive(Debug)]
-pub enum Command {
-    Checkout,
-    Delete,
-    Quit,
-    ClosePopup,
-}
-
-/// Global state of the application
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum AppState {
-    /// Default state, showing branches
-    Normal,
-    /// Showing an error message
-    Error(String),
-    Exiting,
-}
-
-struct Model {
-    actions: Vec<Action<Command>>,
-    checkout_action_idx: usize,
-    delete_action_idx: usize,
-    close_popup_action: Action<Command>,
-    path: PathBuf,
-    table_state: TableState,
-    branches: Vec<Branch>,
-    app_state: AppState,
-    page_size: usize,
-}
-
-impl Model {
-    fn new(path: &Path) -> Self {
-        let mut actions: Vec<Action<Command>> = vec![];
-
-        let checkout_action_idx = actions.len();
-        actions.push(Action::new(
-            "Checkout".into(),
-            KeyCode::Char('c'),
-            Command::Checkout,
-        ));
-
-        let delete_action_idx = actions.len();
-        actions.push(Action::new(
-            "Delete".into(),
-            KeyCode::Char('d'),
-            Command::Delete,
-        ));
-
-        actions.push(Action::new(
-            "Quit".into(),
-            KeyCode::Char('q'),
-            Command::Quit,
-        ));
-        let close_popup_action = Action::new("Close".into(), KeyCode::Esc, Command::ClosePopup);
-        Self {
-            actions,
-            checkout_action_idx,
-            delete_action_idx,
-            close_popup_action,
-            path: path.into(),
-            table_state: TableState::default(),
-            branches: vec![],
-            app_state: AppState::Normal,
-            page_size: 10,
-        }
-    }
-
-    fn update(&mut self) {
-        let branch = self.current_branch();
-        let is_not_checked_out =
-            branch.is_some_and(|x| x.checkout_state == CheckoutState::NotCheckedOut);
-        self.actions[self.checkout_action_idx].enabled = is_not_checked_out;
-        self.actions[self.delete_action_idx].enabled = is_not_checked_out;
-    }
-
-    fn update_branches(&mut self) -> GitResult<()> {
-        let repo = Repository::new(&self.path);
-        self.branches = repo.list_branches()?;
-        Ok(())
-    }
-
-    fn current_branch(&self) -> Option<&Branch> {
-        self.table_state.selected().map(|x| &self.branches[x])
-    }
-
-    fn move_up(&mut self) {
-        match self.table_state.selected() {
-            Some(x) => {
-                let x = if x == 0 {
-                    self.branches.len() - 1
-                } else {
-                    x - 1
-                };
-                self.table_state.select(Some(x));
-            }
-            None => self.table_state.select(Some(self.branches.len() - 1)),
-        };
-    }
-
-    fn move_down(&mut self) {
-        match self.table_state.selected() {
-            Some(x) => {
-                let x = if x < self.branches.len() - 1 {
-                    x + 1
-                } else {
-                    0
-                };
-                self.table_state.select(Some(x));
-            }
-            None => self.table_state.select(Some(0)),
-        };
-    }
-
-    fn page_up(&mut self) {
-        match self.table_state.selected() {
-            Some(x) => {
-                self.table_state
-                    .select(Some(x.saturating_sub(self.page_size)));
-            }
-            None => self.table_state.select(Some(0)),
-        };
-    }
-
-    fn page_down(&mut self) {
-        match self.table_state.selected() {
-            Some(x) => {
-                let x = cmp::min(x + self.page_size, self.branches.len() - 1);
-                self.table_state.select(Some(x));
-            }
-            None => self.table_state.select(Some(0)),
-        };
-    }
-
-    fn checkout(&mut self) {
-        let repo = Repository::new(&self.path);
-        let name = &self
-            .current_branch()
-            .expect("checkout() should not be callable without an active branch")
-            .name;
-        if let Err(error) = repo.checkout(name) {
-            self.app_state = AppState::Error(format!("{}", error));
-            return;
-        }
-        self.update_branches()
-            .expect("update_branches() should not fail after a successful checkout");
-    }
-
-    fn quit(&mut self) {
-        self.app_state = AppState::Exiting;
-    }
-
-    fn delete(&mut self) {
-        let repo = Repository::new(&self.path);
-        let name = &self
-            .current_branch()
-            .expect("delete() should not be callable without an active branch")
-            .name;
-        // TODO show confirmation popup if deleting the branch is not safe
-        if let Err(error) = repo.delete_branch(name) {
-            self.app_state = AppState::Error(format!("{}", error));
-            return;
-        }
-        self.update_branches()
-            .expect("update_branches() should not fail after a successful delete");
     }
 }
 

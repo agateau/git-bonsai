@@ -23,6 +23,7 @@ pub mod batchappui;
 pub mod cliargs;
 pub mod git;
 pub mod interactiveappui;
+pub mod model;
 pub mod popup;
 pub mod ratapp;
 pub mod tui;
