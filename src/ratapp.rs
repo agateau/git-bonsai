@@ -54,13 +54,13 @@ enum ModelState {
     Normal,
     /// Showing an error message
     Error(String),
+    Exiting,
 }
 
 struct Model {
     path: PathBuf,
     table_state: TableState,
     branches: Vec<Branch>,
-    exit: bool,
     model_state: ModelState,
 }
 
@@ -118,7 +118,7 @@ impl Model {
     }
 
     fn quit(&mut self) {
-        self.exit = true;
+        self.model_state = ModelState::Exiting;
     }
 }
 
@@ -152,7 +152,6 @@ impl App {
                 path: path.into(),
                 table_state: TableState::default(),
                 branches: vec![],
-                exit: false,
                 model_state: ModelState::Normal,
             },
         }
@@ -166,7 +165,7 @@ impl App {
             self.model.table_state.select(Some(0));
         }
         let mut terminal = ratatui::init();
-        while !self.model.exit {
+        while self.model.model_state != ModelState::Exiting {
             self.update();
             terminal.draw(|frame| self.draw(frame))?;
             self.handle_events()?;
