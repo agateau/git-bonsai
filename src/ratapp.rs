@@ -58,6 +58,9 @@ enum ModelState {
 }
 
 struct Model {
+    actions: Vec<Action<Command>>,
+    checkout_action_idx: usize,
+    close_popup_action: Action<Command>,
     path: PathBuf,
     table_state: TableState,
     branches: Vec<Branch>,
@@ -65,6 +68,37 @@ struct Model {
 }
 
 impl Model {
+    fn new(path: &Path) -> Self {
+        let mut actions: Vec<Action<Command>> = vec![];
+        actions.push(Action::new(
+            "Checkout".into(),
+            KeyCode::Char('c'),
+            Command::Checkout,
+        ));
+        let checkout_action_idx = actions.len();
+        actions.push(Action::new(
+            "Quit".into(),
+            KeyCode::Char('q'),
+            Command::Quit,
+        ));
+        let close_popup_action = Action::new("Close".into(), KeyCode::Esc, Command::ClosePopup);
+        Self {
+            actions,
+            checkout_action_idx,
+            close_popup_action,
+            path: path.into(),
+            table_state: TableState::default(),
+            branches: vec![],
+            model_state: ModelState::Normal,
+        }
+    }
+
+    fn update(&mut self) {
+        let branch = self.current_branch();
+        let can_checkout = branch.is_some_and(|x| x.checkout_state == CheckoutState::NotCheckedOut);
+        self.actions[self.checkout_action_idx].enabled = can_checkout;
+    }
+
     fn update_branches(&mut self) -> GitResult<()> {
         let repo = Repository::new(&self.path);
         self.branches = repo.list_branches()?;
@@ -123,37 +157,13 @@ impl Model {
 }
 
 struct App {
-    actions: Vec<Action<Command>>,
-    checkout_action_idx: usize,
-    close_popup_action: Action<Command>,
     model: Model,
 }
 
 impl App {
     fn new(_cli_args: CliArgs, path: &Path) -> Self {
-        let mut actions: Vec<Action<Command>> = vec![];
-        actions.push(Action::new(
-            "Checkout".into(),
-            KeyCode::Char('c'),
-            Command::Checkout,
-        ));
-        let checkout_action_idx = actions.len();
-        actions.push(Action::new(
-            "Quit".into(),
-            KeyCode::Char('q'),
-            Command::Quit,
-        ));
-        let close_popup_action = Action::new("Close".into(), KeyCode::Esc, Command::ClosePopup);
         Self {
-            actions,
-            checkout_action_idx,
-            close_popup_action,
-            model: Model {
-                path: path.into(),
-                table_state: TableState::default(),
-                branches: vec![],
-                model_state: ModelState::Normal,
-            },
+            model: Model::new(path),
         }
     }
 
@@ -166,17 +176,11 @@ impl App {
         }
         let mut terminal = ratatui::init();
         while self.model.model_state != ModelState::Exiting {
-            self.update();
+            self.model.update();
             terminal.draw(|frame| self.draw(frame))?;
             self.handle_events()?;
         }
         Ok(())
-    }
-
-    fn update(&mut self) {
-        let branch = self.model.current_branch();
-        let can_checkout = branch.is_some_and(|x| x.checkout_state == CheckoutState::NotCheckedOut);
-        self.actions[self.checkout_action_idx].enabled = can_checkout;
     }
 
     fn render_branch_table(&mut self, frame: &mut Frame, area: Rect) {
@@ -227,6 +231,7 @@ impl App {
 
     fn render_toolbar(&mut self, frame: &mut Frame, area: Rect) {
         let spans: Vec<Span> = self
+            .model
             .actions
             .iter()
             .flat_map(|x| {
@@ -256,7 +261,7 @@ impl App {
         let ModelState::Error(ref error) = self.model.model_state else {
             return;
         };
-        let popup = Popup::new(&self.close_popup_action)
+        let popup = Popup::new(&self.model.close_popup_action)
             .title("Error")
             .content(Text::raw(error));
 
@@ -295,7 +300,7 @@ impl App {
             self.handle_error_key_event(key_event);
             return;
         }
-        for action in &self.actions {
+        for action in &self.model.actions {
             if action.keycode == key_event.code {
                 if action.enabled {
                     match action.command {
@@ -315,7 +320,7 @@ impl App {
     }
 
     fn handle_error_key_event(&mut self, key_event: KeyEvent) {
-        if self.close_popup_action.keycode == key_event.code {
+        if self.model.close_popup_action.keycode == key_event.code {
             self.model.model_state = ModelState::Normal;
         }
     }
