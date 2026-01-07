@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use std::borrow::Cow;
 use std::io;
 use std::path::Path;
 
@@ -18,6 +19,9 @@ use crate::cliargs::CliArgs;
 use crate::git::{AheadBehind, AheadBehindStatus, CheckoutState, Upstream};
 use crate::model::{AppState, Command, Model};
 use crate::popup::Popup;
+
+// If the branch is contained in more than this number of branches, show "and N others"
+const MAX_CONTAINED_IN_BRANCHES: usize = 2;
 
 const EMPTY_STR: &str = "";
 
@@ -83,13 +87,30 @@ impl App {
                         (name.as_ref(), get_ahead_behind_str(ahead_behind))
                     }
                 };
-                Row::new(vec![
-                    checkout_symbol,
-                    &branch.name,
-                    &branch.last_commit_date,
-                    status_str,
-                    upstream_str,
-                ])
+                let contained_in_str: String = match branch.contained_in.len() {
+                    0 => "".into(),
+                    1..=MAX_CONTAINED_IN_BRANCHES => branch.contained_in.join(", "),
+                    _ => {
+                        format!(
+                            "{} and {} other(s)",
+                            branch
+                                .contained_in
+                                .get(..MAX_CONTAINED_IN_BRANCHES)
+                                .unwrap()
+                                .join(", "),
+                            branch.contained_in.len() - MAX_CONTAINED_IN_BRANCHES
+                        )
+                    }
+                };
+                let cells: Vec<Cow<'_, str>> = vec![
+                    checkout_symbol.into(),
+                    branch.name.as_str().into(),
+                    branch.last_commit_date.as_str().into(),
+                    status_str.into(),
+                    contained_in_str.into(),
+                    upstream_str.into(),
+                ];
+                Row::new(cells)
             })
             .collect();
 
@@ -97,11 +118,13 @@ impl App {
             // Checkout state
             Constraint::Length(1),
             // Name
-            Constraint::Fill(1),
+            Constraint::Fill(2),
             // Last commit
             Constraint::Length(30),
             // Status
             Constraint::Length(10),
+            // Contained in
+            Constraint::Fill(1),
             // Upstream
             Constraint::Fill(1),
         ];
@@ -109,8 +132,15 @@ impl App {
         let table = Table::new(rows, widths)
             .column_spacing(2)
             .header(
-                Row::new(vec![" ", "Name", "Last commit", "Status", "Upstream"])
-                    .style(Style::new().bold().green()),
+                Row::new(vec![
+                    " ",
+                    "Name",
+                    "Last commit",
+                    "Status",
+                    "Contained in",
+                    "Upstream",
+                ])
+                .style(Style::new().bold().green()),
             )
             .row_highlight_style(Style::new().reversed());
 

@@ -67,8 +67,8 @@ pub struct Branch {
     pub name: String,
     pub checkout_state: CheckoutState,
     pub last_commit_date: String, // FIXME: use a proper date format
-    //pub status: SyncStatus,
     pub upstream: Option<Upstream>,
+    pub contained_in: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -291,7 +291,13 @@ impl Repository {
 
         let mut branches: Vec<Branch> = vec![];
         for line in stdout.lines() {
-            let branch = parse_git_branch_line(line, &self.path)?;
+            let mut branch = parse_git_branch_line(line, &self.path)?;
+            branch.contained_in = self
+                .list_branches_containing(&branch.name)?
+                .into_iter()
+                // Do not list ourselves
+                .filter(|x| *x != branch.name)
+                .collect();
             branches.push(branch);
         }
         Ok(branches)
@@ -411,6 +417,7 @@ fn parse_git_branch_line(line: &str, repo_path: &Path) -> GitResult<Branch> {
         checkout_state,
         upstream,
         last_commit_date: commit_date_str.into(),
+        contained_in: vec![],
     })
 }
 
@@ -603,6 +610,7 @@ mod tests {
                     name: "origin/master".into(),
                     ahead_behind: Some(AheadBehind::new(2, 4)),
                 }),
+                contained_in: vec![],
             }
         );
     }
