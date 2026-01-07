@@ -140,9 +140,9 @@ impl App {
                     "Contained in",
                     "Upstream",
                 ])
-                .style(Style::new().bold().green()),
+                .style(Style::new().bold().blue()),
             )
-            .row_highlight_style(Style::new().reversed());
+            .row_highlight_style(Style::new().white().on_dark_gray());
 
         self.model.page_size = (area.height - 1) as usize;
 
