@@ -49,7 +49,7 @@ pub enum Command {
 
 /// Global state of the application
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum ModelState {
+enum AppState {
     /// Default state, showing branches
     Normal,
     /// Showing an error message
@@ -64,7 +64,7 @@ struct Model {
     path: PathBuf,
     table_state: TableState,
     branches: Vec<Branch>,
-    model_state: ModelState,
+    app_state: AppState,
 }
 
 impl Model {
@@ -89,7 +89,7 @@ impl Model {
             path: path.into(),
             table_state: TableState::default(),
             branches: vec![],
-            model_state: ModelState::Normal,
+            app_state: AppState::Normal,
         }
     }
 
@@ -144,7 +144,7 @@ impl Model {
             .expect("checkout should not be callable without an active branch")
             .name;
         if let Err(error) = repo.checkout(name) {
-            self.model_state = ModelState::Error(format!("{}", error));
+            self.app_state = AppState::Error(format!("{}", error));
             return;
         }
         self.update_branches()
@@ -152,7 +152,7 @@ impl Model {
     }
 
     fn quit(&mut self) {
-        self.model_state = ModelState::Exiting;
+        self.app_state = AppState::Exiting;
     }
 }
 
@@ -175,7 +175,7 @@ impl App {
             self.model.table_state.select(Some(0));
         }
         let mut terminal = ratatui::init();
-        while self.model.model_state != ModelState::Exiting {
+        while self.model.app_state != AppState::Exiting {
             self.model.update();
             terminal.draw(|frame| self.draw(frame))?;
             self.handle_events()?;
@@ -258,7 +258,7 @@ impl App {
     }
 
     fn render_error_message(&mut self, frame: &mut Frame) {
-        let ModelState::Error(ref error) = self.model.model_state else {
+        let AppState::Error(ref error) = self.model.app_state else {
             return;
         };
         let popup = Popup::new(&self.model.close_popup_action)
@@ -296,7 +296,7 @@ impl App {
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
-        if matches!(self.model.model_state, ModelState::Error(_)) {
+        if matches!(self.model.app_state, AppState::Error(_)) {
             self.handle_error_key_event(key_event);
             return;
         }
@@ -321,7 +321,7 @@ impl App {
 
     fn handle_error_key_event(&mut self, key_event: KeyEvent) {
         if self.model.close_popup_action.keycode == key_event.code {
-            self.model.model_state = ModelState::Normal;
+            self.model.app_state = AppState::Normal;
         }
     }
 }
