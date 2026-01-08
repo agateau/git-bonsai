@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use std::borrow::Cow;
 use std::io;
 use std::path::Path;
 
@@ -58,7 +57,7 @@ impl App {
         self.model
             .update_branches()
             .unwrap_or_else(|x| panic!("Listing branches failed: {}", x));
-        if !self.model.branches.is_empty() {
+        if !self.model.branches().is_empty() {
             self.model.table_state.select(Some(0));
         }
         let mut terminal = ratatui::init();
@@ -71,9 +70,11 @@ impl App {
     }
 
     fn render_branch_table(&mut self, frame: &mut Frame, area: Rect) {
+        self.model.page_size = (area.height - 1) as usize;
+
         let rows: Vec<_> = self
             .model
-            .branches
+            .branches()
             .iter()
             .map(|branch| {
                 let checkout_symbol = match branch.checkout_state {
@@ -81,10 +82,10 @@ impl App {
                     CheckoutState::Current => "*",
                     CheckoutState::WorkTree => "+",
                 };
-                let (upstream_str, status_str) = match &branch.upstream {
-                    None => (EMPTY_STR, EMPTY_STR),
+                let (upstream_str, status_str): (String, &str) = match &branch.upstream {
+                    None => (String::new(), EMPTY_STR),
                     Some(Upstream { name, ahead_behind }) => {
-                        (name.as_ref(), get_ahead_behind_str(ahead_behind))
+                        (name.clone(), get_ahead_behind_str(ahead_behind))
                     }
                 };
                 let contained_in_str: String = match branch.contained_in.len() {
@@ -102,13 +103,13 @@ impl App {
                         )
                     }
                 };
-                let cells: Vec<Cow<'_, str>> = vec![
+                let cells: Vec<String> = vec![
                     checkout_symbol.into(),
-                    branch.name.as_str().into(),
-                    branch.last_commit_date.as_str().into(),
+                    branch.name.clone(),
+                    branch.last_commit_date.clone(),
                     status_str.into(),
-                    contained_in_str.into(),
-                    upstream_str.into(),
+                    contained_in_str,
+                    upstream_str,
                 ];
                 Row::new(cells)
             })
@@ -143,8 +144,6 @@ impl App {
                 .style(Style::new().bold().blue()),
             )
             .row_highlight_style(Style::new().white().on_dark_gray());
-
-        self.model.page_size = (area.height - 1) as usize;
 
         frame.render_stateful_widget(table, area, &mut self.model.table_state);
     }

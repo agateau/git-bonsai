@@ -36,7 +36,7 @@ pub struct Model {
     pub close_popup_action: Action<Command>,
     path: PathBuf,
     pub table_state: TableState,
-    pub branches: Vec<Branch>,
+    branches: Vec<Branch>,
     pub app_state: AppState,
     pub page_size: usize,
 }
@@ -76,6 +76,10 @@ impl Model {
             app_state: AppState::Normal,
             page_size: 10,
         }
+    }
+
+    pub fn branches(&self) -> &Vec<Branch> {
+        &self.branches
     }
 
     pub fn update(&mut self) {
