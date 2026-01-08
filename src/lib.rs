@@ -26,4 +26,5 @@ pub mod interactiveappui;
 pub mod model;
 pub mod popup;
 pub mod ratapp;
+pub mod repositorymodel;
 pub mod tui;

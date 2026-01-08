@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::action::Action;
-use crate::git::{Branch, CheckoutState, GitResult, Repository};
+use crate::git::{Branch, CheckoutState, GitResult};
+use crate::repositorymodel::RepositoryModel;
 use ratatui::widgets::TableState;
 use std::cmp;
 use std::path::Path;
@@ -34,9 +35,8 @@ pub struct Model {
     checkout_action_idx: usize,
     delete_action_idx: usize,
     pub close_popup_action: Action<Command>,
-    repo: Repository,
+    repo_model: RepositoryModel,
     pub table_state: TableState,
-    branches: Vec<Branch>,
     pub app_state: AppState,
     pub page_size: usize,
 }
@@ -70,16 +70,15 @@ impl Model {
             checkout_action_idx,
             delete_action_idx,
             close_popup_action,
-            repo: Repository::new(path),
+            repo_model: RepositoryModel::new(path),
             table_state: TableState::default(),
-            branches: vec![],
             app_state: AppState::Normal,
             page_size: 10,
         }
     }
 
     pub fn branches(&self) -> &Vec<Branch> {
-        &self.branches
+        self.repo_model.branches()
     }
 
     pub fn update(&mut self) {
@@ -91,32 +90,32 @@ impl Model {
     }
 
     pub fn update_branches(&mut self) -> GitResult<()> {
-        self.branches = self.repo.list_branches()?;
+        self.repo_model.update()?;
         Ok(())
     }
 
     fn current_branch(&self) -> Option<&Branch> {
-        self.table_state.selected().map(|x| &self.branches[x])
+        self.table_state.selected().map(|x| &self.branches()[x])
     }
 
     pub fn move_up(&mut self) {
         match self.table_state.selected() {
             Some(x) => {
                 let x = if x == 0 {
-                    self.branches.len() - 1
+                    self.branches().len() - 1
                 } else {
                     x - 1
                 };
                 self.table_state.select(Some(x));
             }
-            None => self.table_state.select(Some(self.branches.len() - 1)),
+            None => self.table_state.select(Some(self.branches().len() - 1)),
         };
     }
 
     pub fn move_down(&mut self) {
         match self.table_state.selected() {
             Some(x) => {
-                let x = if x < self.branches.len() - 1 {
+                let x = if x < self.branches().len() - 1 {
                     x + 1
                 } else {
                     0
@@ -140,7 +139,7 @@ impl Model {
     pub fn page_down(&mut self) {
         match self.table_state.selected() {
             Some(x) => {
-                let x = cmp::min(x + self.page_size, self.branches.len() - 1);
+                let x = cmp::min(x + self.page_size, self.branches().len() - 1);
                 self.table_state.select(Some(x));
             }
             None => self.table_state.select(Some(0)),
@@ -152,7 +151,7 @@ impl Model {
             .current_branch()
             .expect("checkout() should not be callable without an active branch")
             .name;
-        if let Err(error) = self.repo.checkout(name) {
+        if let Err(error) = self.repo_model.checkout(name) {
             self.app_state = AppState::Error(format!("{}", error));
             return;
         }
@@ -170,7 +169,7 @@ impl Model {
             .expect("delete() should not be callable without an active branch")
             .name;
         // TODO show confirmation popup if deleting the branch is not safe
-        if let Err(error) = self.repo.delete_branch(name) {
+        if let Err(error) = self.repo_model.delete_branch(name) {
             self.app_state = AppState::Error(format!("{}", error));
             return;
         }

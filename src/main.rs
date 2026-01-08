@@ -28,6 +28,7 @@ mod interactiveappui;
 mod model;
 mod popup;
 mod ratapp;
+mod repositorymodel;
 mod tui;
 
 use cliargs::CliArgs;
