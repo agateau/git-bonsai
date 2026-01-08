@@ -6,7 +6,7 @@ use crate::action::Action;
 use crate::git::{Branch, CheckoutState, GitResult, Repository};
 use ratatui::widgets::TableState;
 use std::cmp;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crossterm::event::KeyCode;
 
@@ -34,7 +34,7 @@ pub struct Model {
     checkout_action_idx: usize,
     delete_action_idx: usize,
     pub close_popup_action: Action<Command>,
-    path: PathBuf,
+    repo: Repository,
     pub table_state: TableState,
     branches: Vec<Branch>,
     pub app_state: AppState,
@@ -70,7 +70,7 @@ impl Model {
             checkout_action_idx,
             delete_action_idx,
             close_popup_action,
-            path: path.into(),
+            repo: Repository::new(path),
             table_state: TableState::default(),
             branches: vec![],
             app_state: AppState::Normal,
@@ -91,8 +91,7 @@ impl Model {
     }
 
     pub fn update_branches(&mut self) -> GitResult<()> {
-        let repo = Repository::new(&self.path);
-        self.branches = repo.list_branches()?;
+        self.branches = self.repo.list_branches()?;
         Ok(())
     }
 
@@ -149,12 +148,11 @@ impl Model {
     }
 
     pub fn checkout(&mut self) {
-        let repo = Repository::new(&self.path);
         let name = &self
             .current_branch()
             .expect("checkout() should not be callable without an active branch")
             .name;
-        if let Err(error) = repo.checkout(name) {
+        if let Err(error) = self.repo.checkout(name) {
             self.app_state = AppState::Error(format!("{}", error));
             return;
         }
@@ -167,13 +165,12 @@ impl Model {
     }
 
     pub fn delete(&mut self) {
-        let repo = Repository::new(&self.path);
         let name = &self
             .current_branch()
             .expect("delete() should not be callable without an active branch")
             .name;
         // TODO show confirmation popup if deleting the branch is not safe
-        if let Err(error) = repo.delete_branch(name) {
+        if let Err(error) = self.repo.delete_branch(name) {
             self.app_state = AppState::Error(format!("{}", error));
             return;
         }
