@@ -86,6 +86,7 @@ impl Model {
     }
 
     pub fn update(&mut self) {
+        self.repo_model.update();
         let branch = self.current_branch();
         let is_not_checked_out =
             branch.is_some_and(|x| x.checkout_state == CheckoutState::NotCheckedOut);
@@ -94,7 +95,7 @@ impl Model {
     }
 
     pub fn update_branches(&mut self) -> GitResult<()> {
-        self.repo_model.update()?;
+        self.repo_model.update_branches()?;
         Ok(())
     }
 

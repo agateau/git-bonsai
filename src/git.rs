@@ -115,6 +115,7 @@ impl AheadBehind {
     }
 }
 
+#[derive(Clone)]
 pub struct Repository {
     path: PathBuf,
 }
@@ -608,7 +609,6 @@ mod tests {
                     name: "origin/master".into(),
                     ahead_behind: Some(AheadBehind::new(2, 4)),
                 }),
-                contained_in: vec![],
             }
         );
     }
