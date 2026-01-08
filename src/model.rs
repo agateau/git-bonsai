@@ -81,6 +81,10 @@ impl Model {
         self.repo_model.branches()
     }
 
+    pub fn branches_contained_in(&self, branch: &str) -> Option<&Vec<String>> {
+        self.repo_model.branches_contained_in(branch)
+    }
+
     pub fn update(&mut self) {
         let branch = self.current_branch();
         let is_not_checked_out =

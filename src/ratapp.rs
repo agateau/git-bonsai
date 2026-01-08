@@ -88,20 +88,25 @@ impl App {
                         (name.clone(), get_ahead_behind_str(ahead_behind))
                     }
                 };
-                let contained_in_str: String = match branch.contained_in.len() {
-                    0 => "".into(),
-                    1..=MAX_CONTAINED_IN_BRANCHES => branch.contained_in.join(", "),
-                    _ => {
-                        format!(
-                            "{} and {} other(s)",
-                            branch
-                                .contained_in
-                                .get(..MAX_CONTAINED_IN_BRANCHES)
-                                .unwrap()
-                                .join(", "),
-                            branch.contained_in.len() - MAX_CONTAINED_IN_BRANCHES
-                        )
-                    }
+                let contained_in_str: String = match self.model.branches_contained_in(&branch.name)
+                {
+                    // We don't know yet
+                    None => "...".into(),
+                    // We have the info
+                    Some(contained_in) => match contained_in.len() {
+                        0 => "".into(),
+                        1..=MAX_CONTAINED_IN_BRANCHES => contained_in.join(", "),
+                        _ => {
+                            format!(
+                                "{} and {} other(s)",
+                                contained_in
+                                    .get(..MAX_CONTAINED_IN_BRANCHES)
+                                    .unwrap()
+                                    .join(", "),
+                                contained_in.len() - MAX_CONTAINED_IN_BRANCHES
+                            )
+                        }
+                    },
                 };
                 let cells: Vec<String> = vec![
                     checkout_symbol.into(),
