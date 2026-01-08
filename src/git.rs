@@ -117,7 +117,7 @@ impl AheadBehind {
 }
 
 pub struct Repository {
-    pub path: PathBuf,
+    path: PathBuf,
 }
 
 impl Repository {
@@ -125,6 +125,12 @@ impl Repository {
         Repository {
             path: path.to_path_buf().canonicalize().unwrap(),
         }
+    }
+
+    #[allow(dead_code)]
+    // Used by integration tests
+    pub fn path(&self) -> &Path {
+        &self.path
     }
 
     #[allow(dead_code)]
