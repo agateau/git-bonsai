@@ -15,6 +15,7 @@ use crossterm::event::KeyCode;
 pub enum Command {
     Checkout,
     Delete,
+    Filter,
     Quit,
     ClosePopup,
 }
@@ -24,6 +25,8 @@ pub enum Command {
 pub enum AppState {
     /// Default state, showing branches
     Normal,
+    /// Filter UI is visible
+    EditFilter,
     /// Showing an error message
     Error(String),
     Exiting,
@@ -34,6 +37,7 @@ pub struct Model {
     pub actions: Vec<Action<Command>>,
     checkout_action_idx: usize,
     delete_action_idx: usize,
+    filter_action_idx: usize,
     pub close_popup_action: Action<Command>,
     repo_model: RepositoryModel,
     pub table_state: TableState,
@@ -59,6 +63,13 @@ impl Model {
             Command::Delete,
         ));
 
+        let filter_action_idx = actions.len();
+        actions.push(Action::new(
+            "Filter".into(),
+            KeyCode::Char('/'),
+            Command::Filter,
+        ));
+
         actions.push(Action::new(
             "Quit".into(),
             KeyCode::Char('q'),
@@ -69,12 +80,21 @@ impl Model {
             actions,
             checkout_action_idx,
             delete_action_idx,
+            filter_action_idx,
             close_popup_action,
             repo_model: RepositoryModel::new(path),
             table_state: TableState::default(),
             app_state: AppState::Normal,
             page_size: 10,
         }
+    }
+
+    pub fn filter(&self) -> &str {
+        self.repo_model.filter()
+    }
+
+    pub fn set_filter(&mut self, value: &str) {
+        self.repo_model.set_filter(value);
     }
 
     pub fn branches(&self) -> &Vec<Branch> {
@@ -92,6 +112,9 @@ impl Model {
             branch.is_some_and(|x| x.checkout_state == CheckoutState::NotCheckedOut);
         self.actions[self.checkout_action_idx].enabled = is_not_checked_out;
         self.actions[self.delete_action_idx].enabled = is_not_checked_out;
+
+        let filter_suffix = if self.filter().is_empty() { "" } else { "*" };
+        self.actions[self.filter_action_idx].name = format!("Filter{filter_suffix}");
     }
 
     pub fn update_branches(&mut self) -> GitResult<()> {

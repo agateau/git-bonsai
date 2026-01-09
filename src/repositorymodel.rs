@@ -26,6 +26,10 @@ enum Response {
 /// Knows the branch of a git repository, and can fetch info about them
 pub struct RepositoryModel {
     repo: Repository,
+    filter: String,
+    /// The branches, before applying the filter
+    all_branches: Vec<Branch>,
+    /// The filtered branches
     branches: Vec<Branch>,
     branches_contained_in: HashMap<String, Vec<String>>,
     request_tx: mpsc::Sender<Request>,
@@ -63,6 +67,8 @@ impl RepositoryModel {
 
         Self {
             repo,
+            filter: "".into(),
+            all_branches: vec![],
             branches: vec![],
             branches_contained_in: HashMap::new(),
             request_tx,
@@ -70,8 +76,31 @@ impl RepositoryModel {
         }
     }
 
+    pub fn filter(&self) -> &str {
+        &self.filter
+    }
+
+    pub fn set_filter(&mut self, filter: &str) {
+        if self.filter == filter {
+            return;
+        }
+        self.filter = filter.into();
+        self.apply_filter();
+    }
+
+    /// Update self.branches from self.all_branches
+    fn apply_filter(&mut self) {
+        self.branches = self
+            .all_branches
+            .iter()
+            .filter(|x| x.name.contains(&self.filter))
+            .cloned()
+            .collect();
+    }
+
     pub fn update_branches(&mut self) -> GitResult<()> {
-        self.branches = self.repo.list_branches()?;
+        self.all_branches = self.repo.list_branches()?;
+        self.apply_filter();
 
         self.branches_contained_in.clear();
         for branch in &self.branches {

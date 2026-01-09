@@ -204,13 +204,22 @@ impl App {
         frame.render_widget(popup, area);
     }
 
+    fn render_filter_bar(&mut self, frame: &mut Frame, area: Rect, filter: String) {
+        frame.render_widget(Line::from(format!("Filter: {}▎", &filter)), area);
+    }
+
     fn draw(&mut self, frame: &mut Frame) {
         let [content, footer] =
             Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(frame.area());
 
         self.render_branch_table(frame, content);
         self.render_error_message(frame);
-        self.render_toolbar(frame, footer);
+        match &self.model.app_state {
+            AppState::EditFilter => {
+                self.render_filter_bar(frame, footer, self.model.filter().into())
+            }
+            _ => self.render_toolbar(frame, footer),
+        };
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
@@ -226,18 +235,30 @@ impl App {
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
-        if matches!(self.model.app_state, AppState::Error(_)) {
-            self.handle_error_key_event(key_event);
-            return;
+        match self.model.app_state {
+            AppState::Error(_) => {
+                self.handle_error_key_event(key_event);
+            }
+            AppState::Normal => {
+                self.handle_normal_key_event(key_event);
+            }
+            AppState::EditFilter => {
+                self.handle_edit_filter_key_event(key_event);
+            }
+            AppState::Exiting => {}
         }
+    }
+
+    fn handle_normal_key_event(&mut self, key_event: KeyEvent) {
         for action in &self.model.actions {
             if action.keycode == key_event.code {
                 if action.enabled {
                     match action.command {
                         Command::Checkout => self.model.checkout(),
                         Command::Quit => self.model.quit(),
+                        Command::Filter => self.model.app_state = AppState::EditFilter,
                         Command::Delete => self.model.delete(),
-                        _ => panic!("Unexpected command: {:?}", action.command),
+                        Command::ClosePopup => panic!("Unexpected command: {:?}", action.command),
                     }
                 }
                 return;
@@ -255,6 +276,30 @@ impl App {
     fn handle_error_key_event(&mut self, key_event: KeyEvent) {
         if self.model.close_popup_action.keycode == key_event.code {
             self.model.app_state = AppState::Normal;
+        }
+    }
+
+    fn handle_edit_filter_key_event(&mut self, key_event: KeyEvent) {
+        match key_event.code {
+            KeyCode::Char(ch) => {
+                let mut filter = self.model.filter().to_string();
+                filter.push(ch);
+                self.model.set_filter(&filter);
+            }
+            KeyCode::Backspace => {
+                if !self.model.filter().is_empty() {
+                    let filter = self.model.filter()[..self.model.filter().len() - 1].to_string();
+                    self.model.set_filter(&filter);
+                }
+            }
+            KeyCode::Enter => {
+                self.model.app_state = AppState::Normal;
+            }
+            KeyCode::Esc => {
+                self.model.set_filter("");
+                self.model.app_state = AppState::Normal;
+            }
+            _ => {}
         }
     }
 }
