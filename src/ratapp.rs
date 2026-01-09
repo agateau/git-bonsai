@@ -4,6 +4,7 @@
 
 use std::io;
 use std::path::Path;
+use std::time::Duration;
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 
@@ -18,6 +19,9 @@ use crate::cliargs::CliArgs;
 use crate::git::{AheadBehind, AheadBehindStatus, CheckoutState, Upstream};
 use crate::model::{AppState, Command, Model};
 use crate::popup::Popup;
+
+// Wait that long for an input event before redrawing the screen
+const EVENT_POLL_DURATION: Duration = Duration::from_millis(32);
 
 // If the branch is contained in more than this number of branches, show "and N others"
 const MAX_CONTAINED_IN_BRANCHES: usize = 2;
@@ -210,12 +214,14 @@ impl App {
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
-        match event::read()? {
-            Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-                self.handle_key_event(key_event)
-            }
-            _ => {}
-        };
+        if event::poll(EVENT_POLL_DURATION)? {
+            match event::read()? {
+                Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
+                    self.handle_key_event(key_event)
+                }
+                _ => {}
+            };
+        }
         Ok(())
     }
 
