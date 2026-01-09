@@ -113,8 +113,8 @@ impl App {
                     branch.name.clone(),
                     branch.last_commit_date.clone(),
                     status_str.into(),
-                    contained_in_str,
                     upstream_str,
+                    contained_in_str,
                 ];
                 Row::new(cells)
             })
@@ -129,9 +129,9 @@ impl App {
             Constraint::Length(30),
             // Status
             Constraint::Length(10),
-            // Contained in
-            Constraint::Fill(1),
             // Upstream
+            Constraint::Fill(1),
+            // Contained in
             Constraint::Fill(1),
         ];
 
@@ -143,8 +143,8 @@ impl App {
                     "Name",
                     "Last commit",
                     "Status",
-                    "Contained in",
                     "Upstream",
+                    "Contained in",
                 ])
                 .style(Style::new().bold().blue()),
             )
