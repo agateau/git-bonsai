@@ -327,7 +327,7 @@ impl Repository {
     }
 
     /// Update the current branch to its upstream if it can be fast-forwarded
-    pub fn fast_forward_branch(&self) -> GitResult<()> {
+    pub fn fast_forward_current_branch(&self) -> GitResult<()> {
         self.git("merge", &["--ff-only"])?;
         Ok(())
     }
