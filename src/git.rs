@@ -134,7 +134,7 @@ impl Repository {
     }
 
     #[allow(dead_code)]
-    pub fn clone(path: &Path, url: &str) -> GitResult<Repository> {
+    pub fn clone_repository(path: &Path, url: &str) -> GitResult<Repository> {
         let repo = Repository::new(path);
         repo.git("clone", &[url, path.to_str().unwrap()])?;
         Ok(repo)

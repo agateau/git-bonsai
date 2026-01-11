@@ -45,7 +45,7 @@ mod integ {
 
     fn clone_repository(url: &str) -> (assert_fs::TempDir, Repository) {
         let dir = assert_fs::TempDir::new().unwrap();
-        let repo = Repository::clone(dir.path(), &url).unwrap();
+        let repo = Repository::clone_repository(dir.path(), &url).unwrap();
         (dir, repo)
     }
 
