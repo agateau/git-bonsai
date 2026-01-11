@@ -66,7 +66,7 @@ impl App {
             self.model.table_state.select(Some(0));
         }
         let mut terminal = ratatui::init();
-        while self.model.app_state != AppState::Exiting {
+        while !matches!(self.model.app_state, AppState::Exiting) {
             self.model.update();
             terminal.draw(|frame| self.draw(frame))?;
             self.handle_events()?;
@@ -185,8 +185,32 @@ impl App {
             },
         );
     }
+    fn render_progress_popup(&mut self, frame: &mut Frame) {
+        let AppState::RunningTask { ref task } = self.model.app_state else {
+            return;
+        };
+        let action = if task.success().is_some() {
+            &self.model.close_popup_action
+        } else {
+            &self.model.cancel_task_action
+        };
+        let popup = Popup::new(action)
+            .title(task.title())
+            .content(Text::raw(task.output()));
 
-    fn render_error_message(&mut self, frame: &mut Frame) {
+        let frame_area = frame.area();
+        let margin = 2;
+        let area = Rect {
+            x: frame_area.x + margin,
+            y: frame_area.y + margin,
+            width: frame_area.width - 2 * margin,
+            height: frame_area.height - 2 * margin,
+        };
+
+        frame.render_widget(popup, area);
+    }
+
+    fn render_error_popup(&mut self, frame: &mut Frame) {
         let AppState::Error(ref error) = self.model.app_state else {
             return;
         };
@@ -214,7 +238,8 @@ impl App {
             Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(frame.area());
 
         self.render_branch_table(frame, content);
-        self.render_error_message(frame);
+        self.render_progress_popup(frame);
+        self.render_error_popup(frame);
         match &self.model.app_state {
             AppState::EditFilter => {
                 self.render_filter_bar(frame, footer, self.model.filter().into())
@@ -247,6 +272,9 @@ impl App {
                 self.handle_edit_filter_key_event(key_event);
             }
             AppState::Exiting => {}
+            AppState::RunningTask { task: _ } => {
+                self.handle_running_task_key_event(key_event);
+            }
         }
     }
 
@@ -259,7 +287,10 @@ impl App {
                         Command::Quit => self.model.quit(),
                         Command::Filter => self.model.app_state = AppState::EditFilter,
                         Command::Delete => self.model.delete(),
-                        Command::ClosePopup => panic!("Unexpected command: {:?}", action.command),
+                        Command::Sync => self.model.sync(),
+                        Command::ClosePopup | Command::CancelTask => {
+                            panic!("Unexpected command: {:?}", action.command)
+                        }
                     }
                 }
                 return;
@@ -301,6 +332,12 @@ impl App {
                 self.model.app_state = AppState::Normal;
             }
             _ => {}
+        }
+    }
+
+    fn handle_running_task_key_event(&mut self, key_event: KeyEvent) {
+        if key_event.code == self.model.cancel_task_action.keycode {
+            self.model.stop_task();
         }
     }
 }

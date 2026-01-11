@@ -27,11 +27,13 @@ mod app;
 mod appui;
 mod batchappui;
 mod cliargs;
+mod gitsynctask;
 mod interactiveappui;
 mod model;
 mod popup;
 mod ratapp;
 mod repositorymodel;
+mod task;
 mod tui;
 
 use cliargs::CliArgs;

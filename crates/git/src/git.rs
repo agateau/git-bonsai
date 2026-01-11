@@ -56,6 +56,8 @@ pub enum GitError {
     TerminatedBySignal { command: String },
     #[error("unexpected output: {0}")]
     UnexpectedOutput(String),
+    #[error("branch `{0}` cannot be fast-forwarded")]
+    CannotBeFastForwarded(String),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -64,6 +66,24 @@ pub struct Branch {
     pub checkout_state: CheckoutState,
     pub last_commit_date: String, // FIXME: use a proper date format
     pub upstream: Option<Upstream>,
+}
+
+impl Branch {
+    pub fn can_be_fast_forwarded(&self) -> bool {
+        let upstream = match &self.upstream {
+            None => {
+                return false;
+            }
+            Some(x) => x,
+        };
+        let ahead_behind = match &upstream.ahead_behind {
+            None => {
+                return false;
+            }
+            Some(x) => x,
+        };
+        ahead_behind.status() == AheadBehindStatus::Behind
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -338,6 +358,18 @@ impl Repository {
     /// Update the current branch to its upstream if it can be fast-forwarded
     pub fn fast_forward_current_branch(&self) -> GitResult<()> {
         self.git("merge", &["--ff-only"])?;
+        Ok(())
+    }
+
+    pub fn fast_forward_branch(&self, branch: &Branch) -> GitResult<()> {
+        let fail = || GitError::CannotBeFastForwarded(branch.name.clone());
+        let upstream = branch.upstream.clone().ok_or(fail())?;
+        let ahead_behind = upstream.ahead_behind.ok_or(fail())?;
+        if ahead_behind.status() != AheadBehindStatus::Behind {
+            return Err(fail());
+        }
+        let full_branch_name = format!("refs/heads/{}", branch.name);
+        self.git("update-ref", &[&full_branch_name, &upstream.name])?;
         Ok(())
     }
 

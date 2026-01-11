@@ -9,6 +9,8 @@ use std::thread;
 
 use git::{Branch, GitResult, Repository};
 
+use crate::gitsynctask::GitSyncTask;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Request {
     Stop,
@@ -134,6 +136,10 @@ impl RepositoryModel {
 
     pub fn delete_branch(&self, branch: &str) -> GitResult<()> {
         self.repo.delete_branch(branch)
+    }
+
+    pub fn start_syncing(&self) -> GitSyncTask {
+        GitSyncTask::new(self.repo.clone())
     }
 }
 

@@ -6,6 +6,8 @@ use git::{Branch, CheckoutState, GitResult};
 
 use crate::action::Action;
 use crate::repositorymodel::RepositoryModel;
+use crate::task::Task;
+
 use ratatui::widgets::TableState;
 use std::cmp;
 use std::path::Path;
@@ -19,10 +21,11 @@ pub enum Command {
     Filter,
     Quit,
     ClosePopup,
+    Sync,
+    CancelTask,
 }
 
 /// Global state of the application
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AppState {
     /// Default state, showing branches
     Normal,
@@ -31,6 +34,9 @@ pub enum AppState {
     /// Showing an error message
     Error(String),
     Exiting,
+    RunningTask {
+        task: Box<dyn Task>,
+    },
 }
 
 /// The UI "model". Contains all the state used by the UI.
@@ -40,6 +46,7 @@ pub struct Model {
     delete_action_idx: usize,
     filter_action_idx: usize,
     pub close_popup_action: Action<Command>,
+    pub cancel_task_action: Action<Command>,
     repo_model: RepositoryModel,
     pub table_state: TableState,
     pub app_state: AppState,
@@ -72,16 +79,24 @@ impl Model {
         ));
 
         actions.push(Action::new(
+            "Sync".into(),
+            KeyCode::Char('S'),
+            Command::Sync,
+        ));
+
+        actions.push(Action::new(
             "Quit".into(),
             KeyCode::Char('q'),
             Command::Quit,
         ));
+        let cancel_task_action = Action::new("Cancel".into(), KeyCode::Esc, Command::CancelTask);
         let close_popup_action = Action::new("Close".into(), KeyCode::Esc, Command::ClosePopup);
         Self {
             actions,
             checkout_action_idx,
             delete_action_idx,
             filter_action_idx,
+            cancel_task_action,
             close_popup_action,
             repo_model: RepositoryModel::new(path),
             table_state: TableState::default(),
@@ -108,6 +123,10 @@ impl Model {
 
     pub fn update(&mut self) {
         self.repo_model.update();
+        if let AppState::RunningTask { task } = &mut self.app_state {
+            task.update();
+        }
+
         let branch = self.current_branch();
         let is_not_checked_out =
             branch.is_some_and(|x| x.checkout_state == CheckoutState::NotCheckedOut);
@@ -204,5 +223,18 @@ impl Model {
         }
         self.update_branches()
             .expect("update_branches() should not fail after a successful delete");
+    }
+
+    pub fn sync(&mut self) {
+        let mut task: Box<dyn Task> = Box::new(self.repo_model.start_syncing());
+        task.start();
+        self.app_state = AppState::RunningTask { task };
+    }
+
+    pub fn stop_task(&mut self) {
+        self.app_state = AppState::Normal;
+        if let Err(error) = self.repo_model.update_branches() {
+            self.app_state = AppState::Error(format!("{}", error));
+        }
     }
 }

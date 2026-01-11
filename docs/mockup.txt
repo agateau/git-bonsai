@@ -18,6 +18,16 @@ blah blah
 Fast-forward (f) │ Delete (d) │ Menu (m) │ "All" menu (a) │ Sort (s) │ Filter (/)
 
 
++---------------------------+
+| *Synchronizing*           |
+|                           |
+| Fetching changes          |
+| Fast-forwarding foo       |
+| Fast-forwarding main      |
+|                           |
+|              Cancel (Esc) |
++---------------------------+
+
 
 +---------------------------+
 | *Something went wrong*    |
