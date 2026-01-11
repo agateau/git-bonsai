@@ -127,25 +127,20 @@ impl Repository {
         }
     }
 
-    #[allow(dead_code)]
     pub fn init(&self) -> GitResult<()> {
         self.git("init", &["--initial-branch", "main"])?;
         Ok(())
     }
 
-    #[allow(dead_code)]
     pub fn init_bare(&self) -> GitResult<()> {
         self.git("init", &["--initial-branch", "main", "--bare"])?;
         Ok(())
     }
 
-    #[allow(dead_code)]
-    // Used by integration tests
     pub fn path(&self) -> &Path {
         &self.path
     }
 
-    #[allow(dead_code)]
     pub fn clone_repository(path: &Path, url: &str) -> GitResult<Repository> {
         let repo = Repository::new(path);
         repo.git("clone", &[url, path.to_str().unwrap()])?;
@@ -349,20 +344,17 @@ impl Repository {
         Ok(!out.is_empty())
     }
 
-    #[allow(dead_code)]
     pub fn get_current_sha1(&self) -> GitResult<String> {
         let out = self.git("show", &["--no-patch", "--oneline"])?;
         let sha1 = out.split(' ').next().unwrap().to_string();
         Ok(sha1)
     }
 
-    #[allow(dead_code)]
     pub fn create_branch(&self, name: &str) -> GitResult<()> {
         self.git("checkout", &["-b", name])?;
         Ok(())
     }
 
-    #[allow(dead_code)]
     pub fn push(&self) -> GitResult<()> {
         self.git("push", &[])?;
         Ok(())
@@ -445,7 +437,6 @@ fn parse_git_branch_line(line: &str, repo_path: &Path) -> GitResult<Branch> {
 }
 
 // Used by test code
-#[allow(dead_code)]
 pub fn create_test_repository(path: &Path) -> Repository {
     let repo = Repository::new(path);
 
