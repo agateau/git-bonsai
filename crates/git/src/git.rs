@@ -128,7 +128,7 @@ impl Repository {
     }
 
     pub fn init(&self) -> GitResult<()> {
-        self.git("init", &["--initial-branch", "main"])?;
+        self.git("init", &["--initial-branch", INITIAL_BRANCH])?;
         Ok(())
     }
 
@@ -440,8 +440,7 @@ fn parse_git_branch_line(line: &str, repo_path: &Path) -> GitResult<Branch> {
 pub fn create_test_repository(path: &Path) -> Repository {
     let repo = Repository::new(path);
 
-    repo.git("init", &["--initial-branch", INITIAL_BRANCH])
-        .expect("init failed");
+    repo.init().expect("init failed");
     repo.git("config", &["user.name", "test"])
         .expect("setting username failed");
     repo.git("config", &["user.email", "test@example.com"])
