@@ -52,7 +52,7 @@ mod integ {
     }
 
     fn create_branch(repo: &Repository, name: &str) {
-        repo.git("checkout", &["-b", name]).unwrap();
+        repo.create_branch(name).unwrap();
         create_and_commit_file(&repo, name);
     }
 

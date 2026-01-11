@@ -147,6 +147,7 @@ impl Repository {
         Ok(repo)
     }
 
+    /// Low-level function to execute any git command and return its stdout
     pub fn git(&self, subcommand: &str, args: &[&str]) -> GitResult<String> {
         let mut cmd = Command::new("git");
         cmd.current_dir(&self.path);
@@ -441,9 +442,9 @@ pub fn create_test_repository(path: &Path) -> Repository {
     let repo = Repository::new(path);
 
     repo.init().expect("init failed");
-    repo.git("config", &["user.name", "test"])
+    repo.set_config_key("usern.name", "test")
         .expect("setting username failed");
-    repo.git("config", &["user.email", "test@example.com"])
+    repo.set_config_key("user.email", "test@example.com")
         .expect("setting email failed");
 
     // Create a file so that we have more than the start commit
@@ -478,8 +479,7 @@ mod tests {
         let repo = create_test_repository(dir.path());
         assert_eq!(repo.get_current_branch().unwrap(), INITIAL_BRANCH);
 
-        repo.git("checkout", &["-b", "test"])
-            .expect("create branch failed");
+        repo.create_branch("test").unwrap();
         assert_eq!(repo.get_current_branch().unwrap(), "test");
     }
 
@@ -490,7 +490,7 @@ mod tests {
         let repo = create_test_repository(dir.path());
         assert_eq!(repo.get_current_branch().unwrap(), INITIAL_BRANCH);
 
-        repo.git("checkout", &["-b", "test"]).unwrap();
+        repo.create_branch("test").unwrap();
         File::create(dir.path().join("test")).unwrap();
         repo.git("add", &["test"]).unwrap();
         repo.git("commit", &["-m", &format!("Create file")])
@@ -514,7 +514,7 @@ mod tests {
         let dir = assert_fs::TempDir::new().unwrap();
         let repo = create_test_repository(dir.path());
 
-        repo.git("checkout", &["-b", "test"]).unwrap();
+        repo.create_branch("test").unwrap();
         File::create(dir.path().join("test")).unwrap();
         repo.git("add", &["test"]).unwrap();
         repo.git("commit", &["-m", &format!("Create file")])
@@ -528,7 +528,7 @@ mod tests {
 
         // AND when switching to each branch, the current sha1 is the expected one
         for (branch, sha1) in branches_with_sha1 {
-            repo.git("checkout", &[&branch]).unwrap();
+            repo.checkout(&branch).unwrap();
             assert_eq!(repo.get_current_sha1().unwrap(), sha1);
         }
     }
