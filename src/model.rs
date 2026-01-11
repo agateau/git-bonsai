@@ -2,8 +2,9 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use git::{Branch, CheckoutState, GitResult};
+
 use crate::action::Action;
-use crate::git::{Branch, CheckoutState, GitResult};
 use crate::repositorymodel::RepositoryModel;
 use ratatui::widgets::TableState;
 use std::cmp;

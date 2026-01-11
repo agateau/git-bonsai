@@ -11,7 +11,7 @@ use std::{
 use regex::Regex;
 use structopt::StructOpt;
 
-use git_bonsai::git::Repository;
+use git::Repository;
 
 #[derive(StructOpt)]
 enum Command {

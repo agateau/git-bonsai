@@ -23,7 +23,6 @@ mod app;
 mod appui;
 mod batchappui;
 mod cliargs;
-mod git;
 mod interactiveappui;
 mod model;
 mod popup;

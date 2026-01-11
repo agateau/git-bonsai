@@ -1,8 +1,16 @@
-[package]
-name = "git-bonsai"
+[workspace]
+members = ["crates/git"]
+
+[workspace.package]
+edition = "2018"
 version = "0.3.1-alpha.1"
 authors = ["Aurélien Gâteau <mail@agateau.com>"]
-edition = "2018"
+
+[workspace.dependencies]
+thiserror = "2.0.17"
+
+[package]
+name = "git-bonsai"
 description = "Command-line tool to clean the branches of your git garden"
 documentation = "https://github.com/agateau/git-bonsai"
 readme = "README.md"
@@ -11,12 +19,16 @@ repository = "https://github.com/agateau/git-bonsai"
 license = "GPL-3.0+"
 keywords = ["git", "clean"]
 categories = ["command-line-utilities", "development-tools"]
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
 
 [dependencies]
+thiserror.workspace = true
+git = { path = "crates/git" }
 structopt = "0.3.26"
 dialoguer = "0.12.0"
 console = "0.16.2"
-thiserror = "2.0.17"
 crossterm = "0.29.0"
 ratatui = "0.30.0"
 derive_setters = "0.1.8"

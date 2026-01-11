@@ -20,6 +20,7 @@
 mod integ {
     extern crate assert_fs;
     extern crate claim;
+    extern crate git;
     extern crate git_bonsai;
 
     use std::collections::HashSet;
@@ -30,10 +31,11 @@ mod integ {
     use claim::*;
     use predicates::prelude::*;
 
+    use git::{create_test_repository, Repository, INITIAL_BRANCH};
+
     use git_bonsai::app::{self, App, AppError, DEFAULT_BRANCH_CONFIG_KEY};
     use git_bonsai::batchappui::BatchAppUi;
     use git_bonsai::cliargs::CliArgs;
-    use git_bonsai::git::{create_test_repository, Repository, INITIAL_BRANCH};
 
     fn create_repository() -> (assert_fs::TempDir, Repository) {
         let dir = assert_fs::TempDir::new().unwrap();

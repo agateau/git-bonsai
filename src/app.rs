@@ -22,10 +22,11 @@ use std::path::PathBuf;
 
 use thiserror::Error;
 
+use git::{GitError, Repository};
+
 use crate::appui::{AppUi, BranchToDeleteInfo};
 use crate::batchappui::BatchAppUi;
 use crate::cliargs::CliArgs;
-use crate::git::{GitError, Repository};
 use crate::interactiveappui::InteractiveAppUi;
 
 pub static DEFAULT_BRANCH_CONFIG_KEY: &str = "git-bonsai.default-branch";

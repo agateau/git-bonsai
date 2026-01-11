@@ -7,7 +7,7 @@ use std::path::Path;
 use std::sync::mpsc;
 use std::thread;
 
-use crate::git::{Branch, GitResult, Repository};
+use git::{Branch, GitResult, Repository};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Request {

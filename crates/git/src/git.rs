@@ -476,8 +476,6 @@ fn get_command_str(cmd: &Command) -> String {
 
 #[cfg(test)]
 mod tests {
-    extern crate assert_fs;
-
     use super::*;
 
     use yare::parameterized;
@@ -558,7 +556,8 @@ mod tests {
         // AND a clone of this repository
         let clone_path = tmp_dir.path().join("clone");
         fs::create_dir_all(&clone_path).unwrap();
-        let clone_repo = Repository::clone(&clone_path, &source_path.to_str().unwrap()).unwrap();
+        let clone_repo =
+            Repository::clone_repository(&clone_path, &source_path.to_str().unwrap()).unwrap();
 
         // with the topic1 branch checked-out in a separate worktree
         let worktree_dir = assert_fs::TempDir::new().unwrap();
@@ -586,7 +585,8 @@ mod tests {
         // AND a clone of this repository
         let clone_path = tmp_dir.path().join("clone");
         fs::create_dir_all(&clone_path).unwrap();
-        let clone_repo = Repository::clone(&clone_path, &source_path.to_str().unwrap()).unwrap();
+        let clone_repo =
+            Repository::clone_repository(&clone_path, &source_path.to_str().unwrap()).unwrap();
 
         // WHEN I call find_default_branch() on the clone
         let branch = clone_repo.find_default_branch();

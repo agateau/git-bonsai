@@ -21,7 +21,6 @@ pub mod app;
 pub mod appui;
 pub mod batchappui;
 pub mod cliargs;
-pub mod git;
 pub mod interactiveappui;
 pub mod model;
 pub mod popup;

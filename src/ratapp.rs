@@ -14,9 +14,10 @@ use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Row, Table};
 use ratatui::Frame;
 
+use git::{AheadBehind, AheadBehindStatus, CheckoutState, Upstream};
+
 use crate::action::DIM_STYLE;
 use crate::cliargs::CliArgs;
-use crate::git::{AheadBehind, AheadBehindStatus, CheckoutState, Upstream};
 use crate::model::{AppState, Command, Model};
 use crate::popup::Popup;
 
