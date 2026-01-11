@@ -128,6 +128,18 @@ impl Repository {
     }
 
     #[allow(dead_code)]
+    pub fn init(&self) -> GitResult<()> {
+        self.git("init", &["--initial-branch", "main"])?;
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    pub fn init_bare(&self) -> GitResult<()> {
+        self.git("init", &["--initial-branch", "main", "--bare"])?;
+        Ok(())
+    }
+
+    #[allow(dead_code)]
     // Used by integration tests
     pub fn path(&self) -> &Path {
         &self.path
@@ -342,6 +354,18 @@ impl Repository {
         let out = self.git("show", &["--no-patch", "--oneline"])?;
         let sha1 = out.split(' ').next().unwrap().to_string();
         Ok(sha1)
+    }
+
+    #[allow(dead_code)]
+    pub fn create_branch(&self, name: &str) -> GitResult<()> {
+        self.git("checkout", &["-b", name])?;
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    pub fn push(&self) -> GitResult<()> {
+        self.git("push", &[])?;
+        Ok(())
     }
 }
 
