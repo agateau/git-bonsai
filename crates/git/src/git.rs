@@ -17,15 +17,11 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 use std::borrow::Cow;
-use std::env;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use thiserror::Error;
-
-// Define this environment variable to print all executed git commands to stderr
-const GIT_BONSAI_DEBUG: &str = "GB_DEBUG";
 
 // If a branch is checked out in a separate worktree, then `git branch` prefixes it with this
 // string
@@ -156,14 +152,11 @@ impl Repository {
         for arg in args {
             cmd.arg(arg);
         }
-        if env::var(GIT_BONSAI_DEBUG).is_ok() {
-            eprintln!(
-                "DEBUG: pwd={}: git {} {}",
-                self.path.to_str().unwrap(),
-                subcommand,
-                args.join(" ")
-            );
-        }
+        let command_str = get_command_str(&cmd);
+        log::info!(
+            "running git command. pwd={} command=`{command_str}`",
+            self.path.display()
+        );
         let output = match cmd.output() {
             Ok(x) => x,
             Err(x) => {
@@ -171,7 +164,11 @@ impl Repository {
             }
         };
         if !output.status.success() {
-            let command_str = get_command_str(&cmd);
+            log::error!(
+                "git command failed. pwd={} command=`{command_str}` stderr={}",
+                self.path.display(),
+                String::from_utf8_lossy(&output.stderr)
+            );
             return match output.status.code() {
                 Some(code) => Err(GitError::CommandFailed {
                     command: command_str,
@@ -184,6 +181,10 @@ impl Repository {
             };
         }
         let out = String::from_utf8(output.stdout).expect("Failed to decode command stdout");
+        log::debug!(
+            "git command succeeded. pwd={} command=`{command_str}` stdout={out}",
+            self.path.display()
+        );
         Ok(out)
     }
 

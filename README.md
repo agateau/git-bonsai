@@ -137,7 +137,7 @@ cargo install git-bonsai
 
 ## Debugging
 
-If you define the `GB_DEBUG` environment variable, Git Bonsai will print all the git commands it runs.
+You can get a log file of what happens using the `--log PATH` option.
 
 ## Why yet another git cleaning tool?
 

@@ -16,6 +16,10 @@
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+use std::{fs::OpenOptions, path::Path};
+
+use log::LevelFilter;
+use simplelog::{Config, WriteLogger};
 use structopt::StructOpt;
 
 mod action;
@@ -32,11 +36,29 @@ mod tui;
 
 use cliargs::CliArgs;
 
+fn setup_logger(log_path: &Path) {
+    let file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_path)
+        .unwrap_or_else(|err| {
+            eprintln!("Failed to create {}: {}", log_path.display(), err);
+            ::std::process::exit(1);
+        });
+    let _ = WriteLogger::init(LevelFilter::Debug, Config::default(), file);
+}
+
 fn main() {
     let args = CliArgs::from_args();
-    if args.ratatui {
-        ::std::process::exit(ratapp::run(args, "."));
-    } else {
-        ::std::process::exit(app::run(args, "."));
+    if let Some(log_path) = &args.log_path {
+        setup_logger(log_path);
     }
+    log::info!("Start");
+    let exit_code = if args.ratatui {
+        ratapp::run(args, ".")
+    } else {
+        app::run(args, ".")
+    };
+    log::info!("Stop");
+    ::std::process::exit(exit_code);
 }

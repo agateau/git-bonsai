@@ -8,6 +8,7 @@ authors = ["Aurélien Gâteau <mail@agateau.com>"]
 
 [workspace.dependencies]
 thiserror = "2.0.17"
+log = "0.4.29"
 
 [package]
 name = "git-bonsai"
@@ -25,6 +26,7 @@ edition.workspace = true
 
 [dependencies]
 thiserror.workspace = true
+log.workspace = true
 git = { path = "crates/git" }
 structopt = "0.3.26"
 dialoguer = "0.12.0"
@@ -33,6 +35,7 @@ crossterm = "0.29.0"
 ratatui = "0.30.0"
 derive_setters = "0.1.8"
 regex = "1.12.2"
+simplelog = "0.12.2"
 
 [dev-dependencies]
 assert_fs = "1.0.7"

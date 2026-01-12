@@ -16,6 +16,8 @@
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+use std::path::PathBuf;
+
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -39,4 +41,8 @@ pub struct CliArgs {
     /// Use ratatui UI
     #[structopt(short = "r", long = "ratatui")]
     pub ratatui: bool,
+
+    /// Log to file
+    #[structopt(short = "l", long = "log")]
+    pub log_path: Option<PathBuf>,
 }
