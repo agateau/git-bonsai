@@ -221,6 +221,11 @@ impl Model {
             self.app_state = AppState::Error(format!("{}", error));
             return;
         }
+        // Select the previous branch if we were on the last one
+        let nb_branches = self.branches().len();
+        if self.table_state.selected() == Some(nb_branches - 1) {
+            self.table_state.select(Some(nb_branches - 2));
+        }
         self.update_branches()
             .expect("update_branches() should not fail after a successful delete");
     }
@@ -236,5 +241,44 @@ impl Model {
         if let Err(error) = self.repo_model.update_branches() {
             self.app_state = AppState::Error(format!("{}", error));
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use git::{Repository, INITIAL_BRANCH};
+
+    use crate::model::Model;
+
+    #[test]
+    fn delete_last_branch() {
+        // GIVEN a source repository with two branches
+        let tmp_dir = assert_fs::TempDir::new().unwrap();
+
+        let repo = Repository::new(&tmp_dir);
+        repo.init().unwrap();
+        repo.git("commit", &["-m", "empty", "--allow-empty"])
+            .unwrap();
+        repo.create_branch("z").unwrap();
+        repo.checkout(INITIAL_BRANCH).unwrap();
+
+        // AND a model on this repo
+        let mut model = Model::new(&tmp_dir);
+        model.update_branches().unwrap();
+        assert_eq!(model.branches().len(), 2);
+
+        // AND the second branch is selected
+        model.table_state.select(Some(1));
+        let branch = model.current_branch().unwrap();
+        assert_eq!(branch.name, "z");
+
+        // WHEN I delete the branch
+        model.delete();
+
+        // THEN the branch is deleted
+        assert_eq!(repo.list_branch_names().unwrap(), &[INITIAL_BRANCH]);
+
+        // AND the first branch is selected
+        assert_eq!(model.table_state.selected(), Some(0));
     }
 }
