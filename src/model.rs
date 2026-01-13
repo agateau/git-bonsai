@@ -149,12 +149,9 @@ impl Model {
     pub fn move_up(&mut self) {
         match self.table_state.selected() {
             Some(x) => {
-                let x = if x == 0 {
-                    self.branches().len() - 1
-                } else {
-                    x - 1
-                };
-                self.table_state.select(Some(x));
+                if x > 0 {
+                    self.table_state.select(Some(x - 1));
+                }
             }
             None => self.table_state.select(Some(self.branches().len() - 1)),
         };
@@ -163,12 +160,9 @@ impl Model {
     pub fn move_down(&mut self) {
         match self.table_state.selected() {
             Some(x) => {
-                let x = if x < self.branches().len() - 1 {
-                    x + 1
-                } else {
-                    0
-                };
-                self.table_state.select(Some(x));
+                if x < self.branches().len() - 1 {
+                    self.table_state.select(Some(x + 1));
+                }
             }
             None => self.table_state.select(Some(0)),
         };
