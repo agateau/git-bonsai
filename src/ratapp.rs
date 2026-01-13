@@ -301,6 +301,8 @@ impl App {
             KeyCode::Down => self.model.move_down(),
             KeyCode::PageUp => self.model.page_up(),
             KeyCode::PageDown => self.model.page_down(),
+            KeyCode::Home => self.model.move_start(),
+            KeyCode::End => self.model.move_end(),
             _ => {}
         }
     }

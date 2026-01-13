@@ -188,6 +188,14 @@ impl Model {
         };
     }
 
+    pub fn move_start(&mut self) {
+        self.table_state.select(Some(0));
+    }
+
+    pub fn move_end(&mut self) {
+        self.table_state.select(Some(self.branches().len() - 1));
+    }
+
     pub fn checkout(&mut self) {
         let name = &self
             .current_branch()
