@@ -52,13 +52,13 @@ impl RepositoryModel {
                         return;
                     }
                     Request::BranchesContainedIn(name) => {
-                        let contained_in = worker_repo
-                            .list_branches_containing(&name)
-                            .unwrap() // FIXME
-                            .into_iter()
-                            // Do not list ourselves
-                            .filter(|x| *x != name)
-                            .collect();
+                        let Ok(contained_in) = worker_repo.list_branches_containing(&name) else {
+                            // Failure can happen if the branch has just been removed. Ignore it.
+                            continue;
+                        };
+                        // Remove ourselves
+                        let contained_in =
+                            contained_in.into_iter().filter(|x| *x != name).collect();
                         response_tx
                             .send(Response::BranchesContainedIn { name, contained_in })
                             .unwrap();
