@@ -185,8 +185,9 @@ impl Repository {
         };
         if !output.status.success() {
             log::error!(
-                "git command failed. pwd={} command=`{command_str}` stderr={}",
+                "git command failed. pwd={} command=`{command_str}`\nstdout=\n{}\nstderr=\n{}",
                 self.path.display(),
+                String::from_utf8_lossy(&output.stdout),
                 String::from_utf8_lossy(&output.stderr)
             );
             return match output.status.code() {
