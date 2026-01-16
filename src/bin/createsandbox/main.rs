@@ -6,12 +6,15 @@ use std::{
     collections::HashSet,
     fs,
     path::{Path, PathBuf},
+    sync::LazyLock,
 };
 
 use regex::Regex;
 use structopt::StructOpt;
 
 use git::Repository;
+
+static WORD_LIST: LazyLock<HashSet<String>> = LazyLock::new(read_word_list);
 
 #[derive(StructOpt)]
 enum Command {
@@ -48,17 +51,13 @@ fn read_word_list() -> HashSet<String> {
 }
 
 fn many_branches_cmd(repo_path: PathBuf) {
-    eprintln!("Loadeding word list");
-    let words = read_word_list();
-    eprintln!("Word list contains {} words.", words.len());
-
     create_sandbox_dir(&repo_path);
     let repo = Repository::new(&repo_path);
     repo.init().expect("Failed to init repository");
     create_empty_commit(&repo);
 
     eprintln!("Creating branches");
-    for name in words.iter().take(200) {
+    for name in WORD_LIST.iter().take(200) {
         repo.create_branch(name).unwrap_or_else(|err| {
             panic!("Failed to create branch {}: {}", name, err);
         });
