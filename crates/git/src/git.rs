@@ -42,7 +42,7 @@ const GIT_BRANCH_CMD_FIELDS: [&str; 5] = [
 
 pub type GitResult<T> = Result<T, GitError>;
 
-#[derive(Error, Debug, PartialEq, Eq)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum GitError {
     #[error("failed to run git: {0}")]
     FailedToRunGit(String),
