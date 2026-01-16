@@ -6,7 +6,6 @@ use std::{
     collections::HashSet,
     fs,
     path::{Path, PathBuf},
-    sync::LazyLock,
 };
 
 use git_bonsai::logger::setup_stderr_logger;
@@ -14,8 +13,6 @@ use regex::Regex;
 use structopt::StructOpt;
 
 use git::Repository;
-
-static WORD_LIST: LazyLock<HashSet<String>> = LazyLock::new(read_word_list);
 
 #[derive(StructOpt)]
 struct CliArgs {
@@ -47,42 +44,79 @@ fn create_sandbox_dir(sandbox_dir: &Path) {
     fs::create_dir(sandbox_dir).expect("Creating testrepo dir failed");
 }
 
-/// Create a list of words to use as branch names
-fn read_word_list() -> HashSet<String> {
+/// Load a list of words from a file
+fn read_word_list() -> Vec<String> {
     let word_regex = Regex::new("[a-zA-Z0-9]+").unwrap();
     let file_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("LICENSE");
     let text = fs::read_to_string(&file_path)
         .unwrap_or_else(|e| panic!("Failed to read {:?}: {}", file_path, e));
-    word_regex
+    let word_set: HashSet<_> = word_regex
         .find_iter(&text)
         .map(|m| m.as_str().into())
-        .collect()
+        .collect();
+    word_set.into_iter().collect()
+}
+
+struct RandomWordProvider {
+    words: Vec<String>,
+    idx: usize,
+}
+
+impl RandomWordProvider {
+    fn new() -> Self {
+        Self {
+            words: read_word_list(),
+            idx: 0,
+        }
+    }
+
+    fn next(&mut self) -> String {
+        let word = self.words[self.idx].clone();
+        self.idx = (self.idx + 1) % self.words.len();
+        word
+    }
+}
+
+struct RandomCommitCreator {
+    repo: Repository,
+    word_provider: RandomWordProvider,
+}
+
+impl RandomCommitCreator {
+    fn new(repo: &Repository) -> Self {
+        Self {
+            repo: repo.clone(),
+            word_provider: RandomWordProvider::new(),
+        }
+    }
+
+    fn create(&mut self) {
+        let word = self.word_provider.next();
+        let filename = format!("{word}.txt");
+        let path = self.repo.path().join(&filename);
+        fs::write(path, &word).unwrap();
+        self.repo.git("add", &[&filename]).unwrap();
+        self.repo
+            .git("commit", &["-m", &format!("Add {word}")])
+            .unwrap();
+    }
 }
 
 fn many_branches_cmd(repo_path: PathBuf) {
     create_sandbox_dir(&repo_path);
+    let mut word_provider = RandomWordProvider::new();
     let repo = Repository::new(&repo_path);
     repo.init().expect("Failed to init repository");
-    create_empty_commit(&repo);
+    RandomCommitCreator::new(&repo).create();
 
     eprintln!("Creating branches");
-    for name in WORD_LIST.iter().take(200) {
-        repo.create_branch(name).unwrap_or_else(|err| {
+    for _ in 0..200 {
+        let name = word_provider.next();
+        repo.create_branch(&name).unwrap_or_else(|err| {
             panic!("Failed to create branch {}: {}", name, err);
         });
     }
 }
-
-fn create_empty_commit(repo: &Repository) {
-    repo.git("commit", &["--allow-empty", "-m", "Empty"])
-        .unwrap();
-}
-
-fn commit_all(repo: &Repository) {
-    repo.git("add", &["."]).unwrap();
-    repo.git("commit", &["-m", "All changes"]).unwrap();
-}
-
 fn branch_states_cmd(sandbox_dir: PathBuf) {
     create_sandbox_dir(&sandbox_dir);
 
@@ -100,37 +134,34 @@ fn branch_states_cmd(sandbox_dir: PathBuf) {
     let local_repo = Repository::clone_repository(&local_path, &remote_url).unwrap();
 
     eprintln!("Creating commits in main branch");
-    create_empty_commit(&local_repo);
-    create_empty_commit(&local_repo);
+    let mut commit_creator = RandomCommitCreator::new(&local_repo);
+    commit_creator.create();
+    commit_creator.create();
     local_repo.push().unwrap();
 
     eprintln!("Creating a branch in advance");
     local_repo.create_branch("in-advance").unwrap();
-    create_empty_commit(&local_repo);
+    commit_creator.create();
     local_repo.push().unwrap();
-    create_empty_commit(&local_repo);
+    commit_creator.create();
 
     eprintln!("Creating a branch that can be fast-forwarded");
     local_repo.checkout("main").unwrap();
     local_repo.create_branch("can-be-ff").unwrap();
-    create_empty_commit(&local_repo);
-    create_empty_commit(&local_repo);
-    create_empty_commit(&local_repo);
+    commit_creator.create();
+    commit_creator.create();
+    commit_creator.create();
     local_repo.push().unwrap();
     local_repo.git("reset", &["--hard", "HEAD~2"]).unwrap();
 
     eprintln!("Creating a branch that has diverged");
     local_repo.checkout("main").unwrap();
     local_repo.create_branch("diverged").unwrap();
-    fs::write(local_path.join("x"), "x").unwrap();
-    fs::write(local_path.join("y"), "y").unwrap();
-    commit_all(&local_repo);
-    fs::write(local_path.join("z"), "z").unwrap();
-    commit_all(&local_repo);
+    commit_creator.create();
+    commit_creator.create();
     local_repo.push().unwrap();
     local_repo.git("reset", &["--hard", "HEAD~1"]).unwrap();
-    fs::write(local_path.join("a"), "a").unwrap();
-    commit_all(&local_repo);
+    commit_creator.create();
 }
 
 fn main() {
