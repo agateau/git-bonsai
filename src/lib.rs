@@ -31,3 +31,4 @@ pub mod repositorymodel;
 pub mod task;
 pub mod tui;
 pub mod uiutils;
+pub mod worker;

@@ -33,6 +33,7 @@ mod repositorymodel;
 mod task;
 mod tui;
 mod uiutils;
+mod worker;
 
 use cliargs::CliArgs;
 

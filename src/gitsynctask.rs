@@ -2,134 +2,42 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use std::{
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        mpsc, Arc,
-    },
-    thread,
+use git::{Branch, Repository};
+
+use crate::{
+    task::Task,
+    worker::{Worker, WorkerController},
 };
 
-use git::Repository;
-
-use crate::task::Task;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum Request {
-    Start,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum Response {
-    Progress { output: String },
-}
-
 pub struct GitSyncTask {
-    handle: Option<thread::JoinHandle<bool>>,
-    request_tx: mpsc::Sender<Request>,
-    response_rx: mpsc::Receiver<Response>,
-    stop_requested: Arc<AtomicBool>,
+    repo: Repository,
+    worker: Worker<String, bool>,
     output: String,
     success: Option<bool>,
 }
 
 impl GitSyncTask {
     pub fn new(repo: Repository) -> Self {
-        let (request_tx, request_rx) = mpsc::channel();
-        let (response_tx, response_rx) = mpsc::channel();
-
-        let stop_requested = Arc::new(AtomicBool::new(false));
-        let stop_requested_clone = stop_requested.clone();
-        let handle =
-            thread::spawn(move || run_task(repo, request_rx, response_tx, stop_requested_clone));
         Self {
-            handle: Some(handle),
-            request_tx,
-            response_rx,
-            stop_requested,
+            repo,
+            worker: Worker::<String, bool>::default(),
             output: "".into(),
             success: None,
         }
     }
 }
 
-fn run_task(
-    repo: Repository,
-    request_rx: mpsc::Receiver<Request>,
-    response_tx: mpsc::Sender<Response>,
-    stop_requested_arc: Arc<AtomicBool>,
-) -> bool {
-    let send_progress = |msg: &str| {
-        let msg = Response::Progress { output: msg.into() };
-        log::debug!("Sending message: {:?}", msg);
-        response_tx.send(msg).unwrap();
-    };
-    let stop_requested = || stop_requested_arc.load(Ordering::Relaxed);
-    let Ok(request) = request_rx.recv() else {
-        return false;
-    };
-    match request {
-        Request::Start => {
-            send_progress("Fetching latest changes...");
-            if let Err(err) = repo.fetch() {
-                send_progress(&format!("Error: {}", err));
-                return false;
-            }
-            if stop_requested() {
-                return false;
-            }
-
-            send_progress("Updating tracking branches...");
-            let branches = match repo.list_branches() {
-                Ok(x) => x,
-                Err(err) => {
-                    send_progress(&format!("Error: {}", err));
-                    return false;
-                }
-            };
-            if stop_requested() {
-                return false;
-            }
-
-            for branch in branches {
-                if !branch.can_be_fast_forwarded() {
-                    continue;
-                }
-                send_progress(&format!("- {}", branch.name));
-                if let Err(err) = repo.fast_forward_branch(&branch) {
-                    send_progress(&format!("Error: {}", err));
-                    return false;
-                }
-                if stop_requested() {
-                    return false;
-                }
-                send_progress("All done");
-            }
-        }
-    }
-    true
-}
-
 impl Task for GitSyncTask {
     fn start(&mut self) {
-        self.request_tx.send(Request::Start).unwrap();
+        self.worker.start(&process, self.repo.clone());
     }
 
     fn update(&mut self) {
-        while let Ok(response) = self.response_rx.try_recv() {
-            match response {
-                Response::Progress { output } => {
-                    log::debug!("Received progress. output={output}");
-                    self.output.push_str(&format!("{output}\n"));
-                }
-            }
+        if let Some(x) = self.worker.update() {
+            self.success = Some(*x);
         }
-        if let Some(handle) = &self.handle {
-            if handle.is_finished() {
-                log::debug!("task finished");
-                let handle = self.handle.take().unwrap();
-                self.success = Some(handle.join().unwrap());
-            }
+        while let Some(progress) = self.worker.pop_progress() {
+            self.output.push_str(&progress);
         }
     }
 
@@ -146,19 +54,57 @@ impl Task for GitSyncTask {
     }
 }
 
-impl Drop for GitSyncTask {
-    fn drop(&mut self) {
-        if self.handle.is_some() {
-            log::debug!("Sending Stop request");
-            self.stop_requested.store(true, Ordering::Relaxed);
-            self.update();
+fn process(repo: Repository, mut controller: WorkerController<String>) -> bool {
+    log::debug!("Starting process");
+    controller.send_progress("Fetching changes... ".into());
+    if let Err(err) = repo.fetch() {
+        controller.send_progress(format!("ERROR: {}\n", err));
+        return false;
+    }
+    controller.send_progress("OK\n".into());
+    if controller.stop_requested() {
+        return false;
+    }
+
+    let branches = match repo.list_branches() {
+        Ok(x) => x,
+        Err(err) => {
+            controller.send_progress(format!("ERROR: {}\n", err));
+            return false;
+        }
+    };
+    if controller.stop_requested() {
+        return false;
+    }
+
+    let mut success = true;
+    let branches: Vec<Branch> = branches
+        .into_iter()
+        .filter(Branch::can_be_fast_forwarded)
+        .collect();
+
+    for branch in branches {
+        controller.send_progress(format!("Updating {}... ", branch.name));
+        match repo.fast_forward_branch(&branch) {
+            Ok(()) => {
+                controller.send_progress("OK\n".into());
+            }
+            Err(err) => {
+                controller.send_progress(format!("ERROR: {}\n", err));
+                success = false;
+            }
+        }
+        if controller.stop_requested() {
+            return false;
         }
     }
+    controller.send_progress("Finished\n".into());
+    success
 }
 
 #[cfg(test)]
 mod test {
-    use std::{fs, time::Duration};
+    use std::{fs, thread, time::Duration};
 
     use git::{Repository, INITIAL_BRANCH};
 
