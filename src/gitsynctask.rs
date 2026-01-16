@@ -193,15 +193,21 @@ mod test {
         create_empty_commit(&local_repo);
         local_repo.push().unwrap();
 
-        // Create a branch that can be ff
+        // Create branches that can be ff
         local_repo.checkout("main").unwrap();
-        local_repo.create_branch("can-be-ff").unwrap();
-        create_empty_commit(&local_repo);
-        create_empty_commit(&local_repo);
-        create_empty_commit(&local_repo);
-        let target_sha1 = local_repo.get_current_sha1().unwrap();
-        local_repo.push().unwrap();
-        local_repo.git("reset", &["--hard", "HEAD~2"]).unwrap();
+        let mut branch_and_target_sha1s: Vec<(String, String)> = vec![];
+        for x in 0..=4 {
+            let name = format!("can-be-ff-{x}");
+            local_repo.create_branch(&name).unwrap();
+            create_empty_commit(&local_repo);
+            create_empty_commit(&local_repo);
+            create_empty_commit(&local_repo);
+            let target_sha1 = local_repo.get_current_sha1().unwrap();
+            local_repo.push().unwrap();
+            local_repo.git("reset", &["--hard", "HEAD~2"]).unwrap();
+
+            branch_and_target_sha1s.push((name, target_sha1));
+        }
 
         let mut task = GitSyncTask::new(local_repo.clone());
         task.start();
@@ -212,7 +218,10 @@ mod test {
         }
         assert_eq!(task.success(), Some(true));
 
-        let current_sha1 = local_repo.get_current_sha1().unwrap();
-        assert_eq!(current_sha1, target_sha1);
+        for (name, target_sha1) in branch_and_target_sha1s {
+            local_repo.checkout(&name).unwrap();
+            let sha1 = local_repo.get_current_sha1().unwrap();
+            assert_eq!(sha1, target_sha1);
+        }
     }
 }
