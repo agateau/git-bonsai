@@ -23,6 +23,7 @@ pub mod batchappui;
 pub mod cliargs;
 pub mod gitsynctask;
 pub mod interactiveappui;
+pub mod logger;
 pub mod model;
 pub mod popup;
 pub mod ratapp;

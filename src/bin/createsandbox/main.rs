@@ -9,12 +9,21 @@ use std::{
     sync::LazyLock,
 };
 
+use git_bonsai::logger::setup_stderr_logger;
 use regex::Regex;
 use structopt::StructOpt;
 
 use git::Repository;
 
 static WORD_LIST: LazyLock<HashSet<String>> = LazyLock::new(read_word_list);
+
+#[derive(StructOpt)]
+struct CliArgs {
+    #[structopt(short = "d", long = "debug")]
+    pub debug: bool,
+    #[structopt(subcommand)]
+    pub cmd: Command,
+}
 
 #[derive(StructOpt)]
 enum Command {
@@ -125,8 +134,11 @@ fn branch_states_cmd(sandbox_dir: PathBuf) {
 }
 
 fn main() {
-    let command = Command::from_args();
-    match command {
+    let args = CliArgs::from_args();
+    if args.debug {
+        setup_stderr_logger();
+    }
+    match args.cmd {
         Command::ManyBranches { repository_dir } => many_branches_cmd(repository_dir),
         Command::BranchStates { sandbox_dir } => branch_states_cmd(sandbox_dir),
     };
