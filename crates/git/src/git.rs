@@ -149,7 +149,7 @@ impl Repository {
     }
 
     pub fn init_bare(&self) -> GitResult<()> {
-        self.git("init", &["--initial-branch", "main", "--bare"])?;
+        self.git("init", &["--initial-branch", INITIAL_BRANCH, "--bare"])?;
         Ok(())
     }
 

@@ -160,7 +160,7 @@ impl Drop for GitSyncTask {
 mod test {
     use std::{fs, time::Duration};
 
-    use git::Repository;
+    use git::{Repository, INITIAL_BRANCH};
 
     use crate::gitsynctask::GitSyncTask;
 
@@ -194,7 +194,7 @@ mod test {
         local_repo.push().unwrap();
 
         // Create branches that can be ff
-        local_repo.checkout("main").unwrap();
+        local_repo.checkout(INITIAL_BRANCH).unwrap();
         let mut branch_and_target_sha1s: Vec<(String, String)> = vec![];
         for x in 0..=4 {
             let name = format!("can-be-ff-{x}");

@@ -12,7 +12,7 @@ use git_bonsai::logger::setup_stderr_logger;
 use regex::Regex;
 use structopt::StructOpt;
 
-use git::Repository;
+use git::{Repository, INITIAL_BRANCH};
 
 #[derive(StructOpt)]
 struct CliArgs {
@@ -133,7 +133,7 @@ fn branch_states_cmd(sandbox_dir: PathBuf) {
     let remote_url = format!("file://{}", remote_path.display());
     let local_repo = Repository::clone_repository(&local_path, &remote_url).unwrap();
 
-    eprintln!("Creating commits in main branch");
+    eprintln!("Creating commits in the initial branch");
     let mut commit_creator = RandomCommitCreator::new(&local_repo);
     commit_creator.create();
     commit_creator.create();
@@ -146,7 +146,7 @@ fn branch_states_cmd(sandbox_dir: PathBuf) {
     commit_creator.create();
 
     eprintln!("Creating a branch that can be fast-forwarded");
-    local_repo.checkout("main").unwrap();
+    local_repo.checkout(INITIAL_BRANCH).unwrap();
     local_repo.create_branch("can-be-ff").unwrap();
     commit_creator.create();
     commit_creator.create();
@@ -155,7 +155,7 @@ fn branch_states_cmd(sandbox_dir: PathBuf) {
     local_repo.git("reset", &["--hard", "HEAD~2"]).unwrap();
 
     eprintln!("Creating a branch that has diverged");
-    local_repo.checkout("main").unwrap();
+    local_repo.checkout(INITIAL_BRANCH).unwrap();
     local_repo.create_branch("diverged").unwrap();
     commit_creator.create();
     commit_creator.create();
