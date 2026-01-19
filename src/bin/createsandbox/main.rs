@@ -95,10 +95,8 @@ impl RandomCommitCreator {
         let filename = format!("{word}.txt");
         let path = self.repo.path().join(&filename);
         fs::write(path, &word).unwrap();
-        self.repo.git("add", &[&filename]).unwrap();
-        self.repo
-            .git("commit", &["-m", &format!("Add {word}")])
-            .unwrap();
+        self.repo.add(&[&filename]).unwrap();
+        self.repo.commit(&format!("Add {word}")).unwrap();
     }
 }
 

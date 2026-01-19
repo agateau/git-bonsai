@@ -394,6 +394,16 @@ impl Repository {
         self.git("push", &[])?;
         Ok(())
     }
+
+    pub fn add(&self, names: &[&str]) -> GitResult<()> {
+        self.git("add", names)?;
+        Ok(())
+    }
+
+    pub fn commit(&self, message: &str) -> GitResult<()> {
+        self.git("commit", &["-m", message])?;
+        Ok(())
+    }
 }
 
 /// Parse the value returned by the upstream:track,nobracket field
@@ -483,8 +493,8 @@ pub fn create_test_repository(path: &Path) -> Repository {
 
     // Create a file so that we have more than the start commit
     File::create(path.join("f")).unwrap();
-    repo.git("add", &["."]).expect("add failed");
-    repo.git("commit", &["-m", "init"]).expect("commit failed");
+    repo.add(&["."]).expect("add failed");
+    repo.commit("init").expect("commit failed");
 
     repo
 }
@@ -526,9 +536,8 @@ mod tests {
 
         repo.create_branch("test").unwrap();
         File::create(dir.path().join("test")).unwrap();
-        repo.git("add", &["test"]).unwrap();
-        repo.git("commit", &["-m", &format!("Create file")])
-            .unwrap();
+        repo.add(&["test"]).unwrap();
+        repo.commit(&format!("Create file")).unwrap();
 
         repo.checkout(INITIAL_BRANCH).unwrap();
 
@@ -550,9 +559,8 @@ mod tests {
 
         repo.create_branch("test").unwrap();
         File::create(dir.path().join("test")).unwrap();
-        repo.git("add", &["test"]).unwrap();
-        repo.git("commit", &["-m", &format!("Create file")])
-            .unwrap();
+        repo.add(&["test"]).unwrap();
+        repo.commit(&format!("Create file")).unwrap();
 
         // WHEN I list branches with sha1
         let branches_with_sha1 = repo.list_branches_with_sha1s().unwrap();
