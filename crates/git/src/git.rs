@@ -369,8 +369,18 @@ impl Repository {
         if ahead_behind.status() != AheadBehindStatus::Behind {
             return Err(fail());
         }
-        let full_branch_name = format!("refs/heads/{}", branch.name);
-        self.git("update-ref", &[&full_branch_name, &upstream.name])?;
+        match branch.checkout_state {
+            CheckoutState::Current => {
+                self.git("merge", &["--ff-only"])?;
+            }
+            CheckoutState::WorkTree => {
+                todo!()
+            }
+            CheckoutState::NotCheckedOut => {
+                let full_branch_name = format!("refs/heads/{}", branch.name);
+                self.git("update-ref", &[&full_branch_name, &upstream.name])?;
+            }
+        };
         Ok(())
     }
 
@@ -516,6 +526,14 @@ mod tests {
     use yare::parameterized;
 
     use std::fs;
+
+    fn create_file_and_commit(repo: &Repository, content: &str) {
+        let filename = format!("{content}.txt");
+        let path = repo.path.join(&filename);
+        fs::write(path, content).unwrap();
+        repo.add(&[&filename]).unwrap();
+        repo.commit(content).unwrap();
+    }
 
     #[test]
     fn get_current_branch() {
@@ -679,5 +697,76 @@ mod tests {
     fn test_parse_upstream_track_field(field: &str, expected: Option<AheadBehind>) {
         let result = parse_upstream_track_field(field).unwrap();
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn fast_forward_current_branch() {
+        let tmp_dir = assert_fs::TempDir::new().unwrap();
+
+        let remote_path = tmp_dir.join("remote");
+        let local_path = tmp_dir.join("local");
+
+        // GIVEN a remote repository
+        fs::create_dir(&remote_path).unwrap();
+        let remote_repo = Repository::new(&remote_path);
+        remote_repo.init_bare().unwrap();
+
+        // AND a local clone
+        fs::create_dir(&local_path).unwrap();
+        let remote_url = format!("file://{}", remote_path.display());
+        let local_repo = Repository::clone_repository(&local_path, &remote_url).unwrap();
+
+        // AND the current branch can be fast-forwarded
+        create_file_and_commit(&local_repo, "Hello");
+        create_file_and_commit(&local_repo, "World");
+        let target_sha1 = local_repo.get_current_sha1().unwrap();
+        local_repo.push().unwrap();
+        local_repo.git("reset", &["--hard", "HEAD^"]).unwrap();
+
+        // WHEN fast_forward_branch() is called
+        let branches = local_repo.list_branches().unwrap();
+        local_repo.fast_forward_branch(&branches[0]).unwrap();
+
+        // THEN the branch is fast-forwarded
+        assert_eq!(local_repo.get_current_sha1().unwrap(), target_sha1);
+
+        // AND the working copy status is clean
+        assert!(!local_repo.has_changes().unwrap());
+    }
+
+    #[test]
+    fn fast_forward_other_branch() {
+        let tmp_dir = assert_fs::TempDir::new().unwrap();
+
+        let remote_path = tmp_dir.join("remote");
+        let local_path = tmp_dir.join("local");
+
+        // GIVEN a remote repository
+        fs::create_dir(&remote_path).unwrap();
+        let remote_repo = Repository::new(&remote_path);
+        remote_repo.init_bare().unwrap();
+
+        // AND a local clone
+        fs::create_dir(&local_path).unwrap();
+        let remote_url = format!("file://{}", remote_path.display());
+        let local_repo = Repository::clone_repository(&local_path, &remote_url).unwrap();
+
+        // AND the initial branch can be fast-forwarded
+        create_file_and_commit(&local_repo, "Hello");
+        create_file_and_commit(&local_repo, "World");
+        let target_sha1 = local_repo.get_current_sha1().unwrap();
+        local_repo.push().unwrap();
+        local_repo.git("reset", &["--hard", "HEAD^"]).unwrap();
+
+        // AND another branch is checked-out
+        local_repo.create_branch("work").unwrap();
+
+        // WHEN fast_forward_branch() is called
+        let branches = local_repo.list_branches().unwrap();
+        local_repo.fast_forward_branch(&branches[0]).unwrap();
+
+        // THEN the initial branch is fast-forwarded
+        local_repo.checkout(INITIAL_BRANCH).unwrap();
+        assert_eq!(local_repo.get_current_sha1().unwrap(), target_sha1);
     }
 }
