@@ -90,7 +90,7 @@ impl Branch {
 pub enum CheckoutState {
     NotCheckedOut,
     Current,
-    WorkTree,
+    WorkTree(PathBuf),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -369,12 +369,13 @@ impl Repository {
         if ahead_behind.status() != AheadBehindStatus::Behind {
             return Err(fail());
         }
-        match branch.checkout_state {
+        match &branch.checkout_state {
             CheckoutState::Current => {
                 self.git("merge", &["--ff-only"])?;
             }
-            CheckoutState::WorkTree => {
-                todo!()
+            CheckoutState::WorkTree(path) => {
+                let worktree_repo = Repository::new(path);
+                worktree_repo.git("merge", &["--ff-only"])?;
             }
             CheckoutState::NotCheckedOut => {
                 let full_branch_name = format!("refs/heads/{}", branch.name);
@@ -479,7 +480,7 @@ fn parse_git_branch_line(line: &str, repo_path: &Path) -> GitResult<Branch> {
         } else if repo_path.ancestors().any(|x| x == worktree_path) {
             CheckoutState::Current
         } else {
-            CheckoutState::WorkTree
+            CheckoutState::WorkTree(worktree_path.into())
         }
     };
 
@@ -767,6 +768,52 @@ mod tests {
 
         // THEN the initial branch is fast-forwarded
         local_repo.checkout(INITIAL_BRANCH).unwrap();
+        assert_eq!(local_repo.get_current_sha1().unwrap(), target_sha1);
+    }
+
+    #[test]
+    fn fast_forward_worktree() {
+        let tmp_dir = assert_fs::TempDir::new().unwrap();
+
+        let remote_path = tmp_dir.join("remote");
+        let local_path = tmp_dir.join("local");
+        let worktree_path = tmp_dir.join("worktree");
+
+        // GIVEN a remote repository
+        fs::create_dir(&remote_path).unwrap();
+        let remote_repo = Repository::new(&remote_path);
+        remote_repo.init_bare().unwrap();
+
+        // AND a local clone
+        fs::create_dir(&local_path).unwrap();
+        let remote_url = format!("file://{}", remote_path.display());
+        let local_repo = Repository::clone_repository(&local_path, &remote_url).unwrap();
+
+        // AND the initial branch can be fast-forwarded
+        create_file_and_commit(&local_repo, "Hello");
+        create_file_and_commit(&local_repo, "World");
+        let target_sha1 = local_repo.get_current_sha1().unwrap();
+        local_repo.push().unwrap();
+        local_repo.git("reset", &["--hard", "HEAD^"]).unwrap();
+
+        // AND another branch is checked-out in a separate worktree
+        local_repo
+            .git(
+                "worktree",
+                &["add", "-b", "work", worktree_path.to_str().unwrap()],
+            )
+            .unwrap();
+        let worktree_repo = Repository::new(&worktree_path);
+
+        // WHEN fast_forward_branch() is called from the worktree
+        // (meaning the initial branch is seen as in CheckoutState::WorkTree)
+        let branches = worktree_repo.list_branches().unwrap();
+        let branch = &branches[0];
+        assert_eq!(branch.name, INITIAL_BRANCH);
+        assert!(matches!(branch.checkout_state, CheckoutState::WorkTree(_)));
+        worktree_repo.fast_forward_branch(&branch).unwrap();
+
+        // THEN the initial branch is fast-forwarded
         assert_eq!(local_repo.get_current_sha1().unwrap(), target_sha1);
     }
 }

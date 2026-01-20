@@ -85,7 +85,7 @@ impl App {
                 let checkout_symbol = match branch.checkout_state {
                     CheckoutState::NotCheckedOut => " ",
                     CheckoutState::Current => "*",
-                    CheckoutState::WorkTree => "+",
+                    CheckoutState::WorkTree(_) => "+",
                 };
                 let (upstream_str, status_str): (String, &str) = match &branch.upstream {
                     None => (String::new(), EMPTY_STR),
