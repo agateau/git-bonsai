@@ -244,7 +244,8 @@ impl App {
             AppState::EditFilter => {
                 self.render_filter_bar(frame, footer, self.model.filter().into())
             }
-            _ => self.render_toolbar(frame, footer),
+            AppState::Normal => self.render_toolbar(frame, footer),
+            _ => {}
         };
     }
 
