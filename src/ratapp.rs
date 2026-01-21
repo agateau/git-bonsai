@@ -20,6 +20,7 @@ use crate::action::DIM_STYLE;
 use crate::cliargs::CliArgs;
 use crate::model::{AppState, Command, Model};
 use crate::popup::Popup;
+use crate::uiutils;
 
 // Wait that long for an input event before redrawing the screen
 const EVENT_POLL_DURATION: Duration = Duration::from_millis(32);
@@ -116,7 +117,7 @@ impl App {
                 let cells: Vec<String> = vec![
                     checkout_symbol.into(),
                     branch.name.clone(),
-                    branch.last_commit_date.clone(),
+                    uiutils::format_datetime(&branch.last_commit_date),
                     status_str.into(),
                     upstream_str,
                     contained_in_str,

@@ -32,6 +32,7 @@ mod ratapp;
 mod repositorymodel;
 mod task;
 mod tui;
+mod uiutils;
 
 use cliargs::CliArgs;
 

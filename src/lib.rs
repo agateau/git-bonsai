@@ -30,3 +30,4 @@ pub mod ratapp;
 pub mod repositorymodel;
 pub mod task;
 pub mod tui;
+pub mod uiutils;

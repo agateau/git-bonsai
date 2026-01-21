@@ -21,6 +21,7 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use chrono::{DateTime, FixedOffset};
 use thiserror::Error;
 
 // If a branch is checked out in a separate worktree, then `git branch` prefixes it with this
@@ -37,7 +38,7 @@ const GIT_BRANCH_CMD_FIELDS: [&str; 5] = [
     "upstream:short",
     "upstream:track,nobracket",
     "worktreepath",
-    "committerdate",
+    "committerdate:iso-strict",
 ];
 
 pub type GitResult<T> = Result<T, GitError>;
@@ -58,13 +59,21 @@ pub enum GitError {
     UnexpectedOutput(String),
     #[error("branch `{0}` cannot be fast-forwarded")]
     CannotBeFastForwarded(String),
+    #[error("cannot parse commit date: {0}")]
+    InvalidCommitDate(String),
+}
+
+impl From<chrono::ParseError> for GitError {
+    fn from(value: chrono::ParseError) -> Self {
+        GitError::InvalidCommitDate(value.to_string())
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Branch {
     pub name: String,
     pub checkout_state: CheckoutState,
-    pub last_commit_date: String, // FIXME: use a proper date format
+    pub last_commit_date: DateTime<FixedOffset>,
     pub upstream: Option<Upstream>,
 }
 
@@ -484,11 +493,13 @@ fn parse_git_branch_line(line: &str, repo_path: &Path) -> GitResult<Branch> {
         }
     };
 
+    let last_commit_date = DateTime::parse_from_rfc3339(commit_date_str)?;
+
     Ok(Branch {
         name: refname.into(),
         checkout_state,
         upstream,
-        last_commit_date: commit_date_str.into(),
+        last_commit_date,
     })
 }
 
@@ -524,6 +535,7 @@ fn get_command_str(cmd: &Command) -> String {
 mod tests {
     use super::*;
 
+    use chrono::TimeZone;
     use yare::parameterized;
 
     use std::fs;
@@ -669,17 +681,21 @@ mod tests {
             "origin/master",
             "ahead 2, behind 4",
             "",
-            "Tue Dec 30 23:23:09 2025 +0100",
+            "2025-12-30T12:34:56+01:00",
         ];
         assert_eq!(tokens.len(), GIT_BRANCH_CMD_FIELDS.len());
         let line = tokens.join("\x00");
         let branch = parse_git_branch_line(&line, Path::new(".")).unwrap();
+        let expected_commit_date = FixedOffset::east_opt(3600)
+            .unwrap()
+            .with_ymd_and_hms(2025, 12, 30, 12, 34, 56)
+            .unwrap();
         assert_eq!(
             branch,
             Branch {
                 name: "master".into(),
                 checkout_state: CheckoutState::NotCheckedOut,
-                last_commit_date: "Tue Dec 30 23:23:09 2025 +0100".into(),
+                last_commit_date: expected_commit_date,
                 upstream: Some(Upstream {
                     name: "origin/master".into(),
                     ahead_behind: Some(AheadBehind::new(2, 4)),

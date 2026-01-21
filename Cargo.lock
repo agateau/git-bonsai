@@ -179,6 +179,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
+name = "chrono"
+version = "0.4.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fac4744fb15ae8337dc853fee7fb3f4e48c0fbaa23d0afe49c447b4fab126118"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "claim"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -600,6 +609,7 @@ name = "git"
 version = "0.3.1-alpha.1"
 dependencies = [
  "assert_fs",
+ "chrono",
  "log",
  "thiserror 2.0.17",
  "yare",
@@ -610,6 +620,7 @@ name = "git-bonsai"
 version = "0.3.1-alpha.1"
 dependencies = [
  "assert_fs",
+ "chrono",
  "claim",
  "console",
  "crossterm",
