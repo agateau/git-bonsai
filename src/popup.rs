@@ -7,7 +7,7 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, Paragraph, Widget, Wrap},
 };
 
-use crate::action::{Action, DIM_STYLE};
+use crate::{action::Action, uiutils};
 
 #[derive(Debug, Setters)]
 pub struct Popup<'a, T> {
@@ -35,13 +35,13 @@ impl<'a, T> Popup<'a, T> {
 impl<T> Widget for Popup<'_, T> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         Clear.render(area, buf);
-        let close_spans = self.close_action.create_spans();
+        let close_spans = uiutils::create_spans_for_action(self.close_action);
         let block = Block::new()
             .title(Line::from(format!(" {} ", self.title)).centered())
             .title_bottom(Line::from(close_spans).right_aligned())
             .title_style(self.title_style)
             .borders(Borders::ALL)
-            .border_style(DIM_STYLE)
+            .border_style(uiutils::DIM_STYLE)
             .border_type(BorderType::Rounded);
         Paragraph::new(self.content)
             .wrap(Wrap { trim: true })

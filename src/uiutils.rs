@@ -4,6 +4,15 @@
 
 use chrono::{DateTime, FixedOffset, Utc};
 
+use ratatui::layout::Rect;
+use ratatui::style::Style;
+use ratatui::text::{Line, Span};
+use ratatui::Frame;
+
+use crate::action::Action;
+
+pub const DIM_STYLE: Style = Style::new().dark_gray();
+
 pub fn format_datetime(datetime: &DateTime<FixedOffset>) -> String {
     let delta = datetime.signed_duration_since(Utc::now());
     if delta.num_days() == 0 {
@@ -17,4 +26,50 @@ pub fn format_datetime(datetime: &DateTime<FixedOffset>) -> String {
         return datetime.format("%b %d, %H:%M").to_string();
     }
     datetime.format("%Y %b %d, %H:%M").to_string()
+}
+
+/// Create a styled vec of spans representing an action and its shortcut
+pub fn create_spans_for_action<T>(action: &Action<T>) -> Vec<Span<'_>> {
+    let name = &action.name;
+    let keycode = action.keycode;
+    let enabled = action.enabled;
+    let text_style = Style::new();
+    let shortcut_style = Style::new().yellow();
+
+    vec![
+        Span::styled("┤", DIM_STYLE),
+        Span::styled(name, if enabled { text_style } else { DIM_STYLE }),
+        Span::styled(" (", DIM_STYLE),
+        Span::styled(
+            format!("{}", keycode),
+            if enabled { shortcut_style } else { DIM_STYLE },
+        ),
+        Span::styled(")├", DIM_STYLE),
+    ]
+}
+
+pub fn render_toolbar<T>(frame: &mut Frame, area: Rect, actions: &[Action<T>]) {
+    let spans: Vec<Span> = actions
+        .iter()
+        .flat_map(|x| {
+            let mut action_spans = create_spans_for_action(x);
+            action_spans.push(Span::styled("─", DIM_STYLE));
+            action_spans
+        })
+        .collect();
+
+    let toolbar = Line::from(spans);
+    let toolbar_end = toolbar.width() as u16;
+    frame.render_widget(toolbar, area);
+
+    let padding = area.width - toolbar_end;
+    frame.render_widget(
+        Line::styled("─".repeat(padding as usize), DIM_STYLE),
+        Rect {
+            x: toolbar_end,
+            y: area.y,
+            width: padding,
+            height: 1,
+        },
+    );
 }

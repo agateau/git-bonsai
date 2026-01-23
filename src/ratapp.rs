@@ -10,13 +10,12 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::Style;
-use ratatui::text::{Line, Span, Text};
+use ratatui::text::{Line, Text};
 use ratatui::widgets::{Row, Table};
 use ratatui::Frame;
 
 use git::{AheadBehind, AheadBehindStatus, CheckoutState, Upstream};
 
-use crate::action::DIM_STYLE;
 use crate::cliargs::CliArgs;
 use crate::model::{AppState, Command, Model};
 use crate::popup::Popup;
@@ -160,32 +159,9 @@ impl App {
     }
 
     fn render_toolbar(&mut self, frame: &mut Frame, area: Rect) {
-        let spans: Vec<Span> = self
-            .model
-            .actions
-            .iter()
-            .flat_map(|x| {
-                let mut action_spans = x.create_spans();
-                action_spans.push(Span::styled("─", DIM_STYLE));
-                action_spans
-            })
-            .collect();
-
-        let toolbar = Line::from(spans);
-        let toolbar_end = toolbar.width() as u16;
-        frame.render_widget(toolbar, area);
-
-        let padding = area.width - toolbar_end;
-        frame.render_widget(
-            Line::styled("─".repeat(padding as usize), DIM_STYLE),
-            Rect {
-                x: toolbar_end,
-                y: area.y,
-                width: padding,
-                height: 1,
-            },
-        );
+        uiutils::render_toolbar(frame, area, &self.model.actions);
     }
+
     fn render_progress_popup(&mut self, frame: &mut Frame) {
         let AppState::RunningTask { ref task } = self.model.app_state else {
             return;

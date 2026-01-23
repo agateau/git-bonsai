@@ -1,8 +1,8 @@
-use crossterm::event::KeyCode;
-use ratatui::style::Style;
-use ratatui::text::Span;
+// SPDX-FileCopyrightText: 2026 Aurélien Gâteau <mail@agateau.com>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
 
-pub const DIM_STYLE: Style = Style::new().dark_gray();
+use crossterm::event::KeyCode;
 
 #[derive(Debug, Clone)]
 pub struct Action<T> {
@@ -20,25 +20,5 @@ impl<T> Action<T> {
             enabled: true,
             command,
         }
-    }
-
-    /// Create a styled vec of spans representing an action and its shortcut
-    pub fn create_spans(&self) -> Vec<Span<'_>> {
-        let name = &self.name;
-        let keycode = self.keycode;
-        let enabled = self.enabled;
-        let text_style = Style::new();
-        let shortcut_style = Style::new().yellow();
-
-        vec![
-            Span::styled("┤", DIM_STYLE),
-            Span::styled(name, if enabled { text_style } else { DIM_STYLE }),
-            Span::styled(" (", DIM_STYLE),
-            Span::styled(
-                format!("{}", keycode),
-                if enabled { shortcut_style } else { DIM_STYLE },
-            ),
-            Span::styled(")├", DIM_STYLE),
-        ]
     }
 }
