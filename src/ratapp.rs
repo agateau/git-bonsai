@@ -9,16 +9,18 @@ use std::time::Duration;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::Style;
-use ratatui::text::{Line, Text};
+use ratatui::style::{Style, Stylize};
+use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Row, Table};
 use ratatui::Frame;
 
 use git::{AheadBehind, AheadBehindStatus, CheckoutState, Upstream};
 
+use crate::action::Action;
 use crate::cliargs::CliArgs;
 use crate::model::{AppState, Command, Model};
 use crate::popup::Popup;
+use crate::repositorymodel::Column;
 use crate::uiutils;
 
 // Wait that long for an input event before redrawing the screen
@@ -140,16 +142,36 @@ impl App {
             Constraint::Fill(1),
         ];
 
+        let sort_by = self.model.sort_by();
+        let format_column = |text: &str, column: Column| {
+            let is_current_column = sort_by.column == column;
+            let indicator = if is_current_column {
+                if sort_by.ascending {
+                    " ▲"
+                } else {
+                    " ▼"
+                }
+            } else {
+                ""
+            };
+            let txt = format!("{text}{indicator}");
+            if matches!(self.model.app_state, AppState::EditSort) && is_current_column {
+                Span::raw(txt).yellow()
+            } else {
+                Span::raw(txt)
+            }
+        };
+
         let table = Table::new(rows, widths)
             .column_spacing(2)
             .header(
                 Row::new(vec![
-                    " ",
-                    "Name",
-                    "Last commit",
-                    "Status",
-                    "Upstream",
-                    "Contained in",
+                    Span::raw(" "),
+                    format_column("Name", Column::Name),
+                    format_column("Last commit", Column::LastCommit),
+                    Span::raw("Status"),
+                    Span::raw("Upstream"),
+                    Span::raw("Contained in"),
                 ])
                 .style(Style::new().bold().blue()),
             )
@@ -210,6 +232,17 @@ impl App {
         frame.render_widget(Line::from(format!("Filter: {}▎", &filter)), area);
     }
 
+    fn render_sort_bar(&mut self, frame: &mut Frame, area: Rect) {
+        let actions: Vec<Action<()>> = vec![
+            Action::new("Previous".into(), KeyCode::Left, ()),
+            Action::new("Next".into(), KeyCode::Right, ()),
+            Action::new("Ascending".into(), KeyCode::Up, ()),
+            Action::new("Descending".into(), KeyCode::Down, ()),
+            Action::new("Done".into(), KeyCode::Esc, ()),
+        ];
+        uiutils::render_toolbar(frame, area, &actions);
+    }
+
     fn draw(&mut self, frame: &mut Frame) {
         let [content, footer] =
             Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(frame.area());
@@ -221,6 +254,7 @@ impl App {
             AppState::EditFilter => {
                 self.render_filter_bar(frame, footer, self.model.filter().into())
             }
+            AppState::EditSort => self.render_sort_bar(frame, footer),
             AppState::Normal => self.render_toolbar(frame, footer),
             _ => {}
         };
@@ -249,6 +283,9 @@ impl App {
             AppState::EditFilter => {
                 self.handle_edit_filter_key_event(key_event);
             }
+            AppState::EditSort => {
+                self.handle_edit_sort_key_event(key_event);
+            }
             AppState::Exiting => {}
             AppState::RunningTask { task: _ } => {
                 self.handle_running_task_key_event(key_event);
@@ -266,6 +303,7 @@ impl App {
                         Command::Filter => self.model.app_state = AppState::EditFilter,
                         Command::Delete => self.model.delete(),
                         Command::Sync => self.model.sync(),
+                        Command::Sort => self.model.app_state = AppState::EditSort,
                         Command::ClosePopup | Command::CancelTask => {
                             panic!("Unexpected command: {:?}", action.command)
                         }
@@ -309,6 +347,32 @@ impl App {
             }
             KeyCode::Esc => {
                 self.model.set_filter("");
+                self.model.app_state = AppState::Normal;
+            }
+            _ => {}
+        }
+    }
+
+    fn handle_edit_sort_key_event(&mut self, key_event: KeyEvent) {
+        let mut sort_by = self.model.sort_by();
+        match key_event.code {
+            KeyCode::Left => {
+                sort_by.column = sort_by.column.prev();
+                self.model.set_sort_by(sort_by);
+            }
+            KeyCode::Right => {
+                sort_by.column = sort_by.column.next();
+                self.model.set_sort_by(sort_by);
+            }
+            KeyCode::Up => {
+                sort_by.ascending = true;
+                self.model.set_sort_by(sort_by);
+            }
+            KeyCode::Down => {
+                sort_by.ascending = false;
+                self.model.set_sort_by(sort_by);
+            }
+            KeyCode::Enter | KeyCode::Esc => {
                 self.model.app_state = AppState::Normal;
             }
             _ => {}

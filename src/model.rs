@@ -5,7 +5,7 @@
 use git::{Branch, CheckoutState, GitResult};
 
 use crate::action::Action;
-use crate::repositorymodel::RepositoryModel;
+use crate::repositorymodel::{RepositoryModel, SortBy};
 use crate::task::Task;
 
 use ratatui::widgets::TableState;
@@ -23,6 +23,7 @@ pub enum Command {
     ClosePopup,
     Sync,
     CancelTask,
+    Sort,
 }
 
 /// Global state of the application
@@ -31,6 +32,8 @@ pub enum AppState {
     Normal,
     /// Filter UI is visible
     EditFilter,
+    /// Edit the sort order
+    EditSort,
     /// Showing an error message
     Error(String),
     Exiting,
@@ -76,6 +79,12 @@ impl Model {
             "Filter".into(),
             KeyCode::Char('/'),
             Command::Filter,
+        ));
+
+        actions.push(Action::new(
+            "Sort".into(),
+            KeyCode::Char('o'),
+            Command::Sort,
         ));
 
         actions.push(Action::new(
@@ -243,6 +252,14 @@ impl Model {
         if let Err(error) = self.repo_model.update_branches() {
             self.app_state = AppState::Error(format!("{}", error));
         }
+    }
+
+    pub fn sort_by(&self) -> SortBy {
+        self.repo_model.sort_by()
+    }
+
+    pub fn set_sort_by(&mut self, sort_by: SortBy) {
+        self.repo_model.set_sort_by(sort_by)
     }
 }
 

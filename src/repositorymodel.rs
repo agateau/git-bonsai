@@ -25,6 +25,45 @@ enum Response {
     },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Column {
+    Name,
+    LastCommit,
+}
+
+const COLUMNS: &[Column; 2] = &[Column::Name, Column::LastCommit];
+
+impl Column {
+    pub fn next(&self) -> Self {
+        for (mut idx, value) in COLUMNS.iter().enumerate() {
+            if value == self {
+                idx = (idx + 1) % COLUMNS.len();
+                return COLUMNS[idx];
+            }
+        }
+        panic!("This should not happen");
+    }
+    pub fn prev(&self) -> Self {
+        for (mut idx, value) in COLUMNS.iter().enumerate() {
+            if value == self {
+                if idx == 0 {
+                    idx = COLUMNS.len() - 1;
+                } else {
+                    idx -= 1;
+                }
+                return COLUMNS[idx];
+            }
+        }
+        panic!("This should not happen");
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SortBy {
+    pub column: Column,
+    pub ascending: bool,
+}
+
 /// Knows the branch of a git repository, and can fetch info about them
 pub struct RepositoryModel {
     repo: Repository,
@@ -36,6 +75,7 @@ pub struct RepositoryModel {
     branches_contained_in: HashMap<String, Vec<String>>,
     request_tx: mpsc::Sender<Request>,
     response_rx: mpsc::Receiver<Response>,
+    sort_by: SortBy,
 }
 
 impl RepositoryModel {
@@ -75,6 +115,10 @@ impl RepositoryModel {
             branches_contained_in: HashMap::new(),
             request_tx,
             response_rx,
+            sort_by: SortBy {
+                column: Column::Name,
+                ascending: true,
+            },
         }
     }
 
@@ -90,6 +134,18 @@ impl RepositoryModel {
         self.apply_filter();
     }
 
+    pub fn sort_by(&self) -> SortBy {
+        self.sort_by
+    }
+
+    pub fn set_sort_by(&mut self, sort_by: SortBy) {
+        if self.sort_by == sort_by {
+            return;
+        }
+        self.sort_by = sort_by;
+        self.apply_filter();
+    }
+
     /// Update self.branches from self.all_branches
     fn apply_filter(&mut self) {
         self.branches = self
@@ -98,6 +154,13 @@ impl RepositoryModel {
             .filter(|x| x.name.contains(&self.filter))
             .cloned()
             .collect();
+        match self.sort_by.column {
+            Column::Name => self.branches.sort_by_key(|x| x.name.clone()),
+            Column::LastCommit => self.branches.sort_by_key(|x| x.last_commit_date),
+        }
+        if !self.sort_by.ascending {
+            self.branches.reverse();
+        }
     }
 
     pub fn update_branches(&mut self) -> GitResult<()> {
