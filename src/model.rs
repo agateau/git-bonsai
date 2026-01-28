@@ -14,16 +14,21 @@ use std::path::Path;
 
 use crossterm::event::KeyCode;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Command {
     Checkout,
-    Delete,
+    AskDeleteBranch,
     Filter,
     Quit,
     ClosePopup,
     Sync,
-    CancelTask,
+    Cancel,
     Sort,
+    DoDeleteBranch,
+}
+
+fn create_confirm_action(name: String, command: Command) -> Action<Command> {
+    Action::new(name, KeyCode::Enter, command)
 }
 
 /// Global state of the application
@@ -36,6 +41,12 @@ pub enum AppState {
     EditSort,
     /// Showing an error message
     Error(String),
+    /// Showing a confirmation message
+    Confirm {
+        message: String,
+        on_cancel: Action<Command>,
+        on_confirm: Action<Command>,
+    },
     Exiting,
     RunningTask {
         task: Box<dyn Task>,
@@ -48,8 +59,8 @@ pub struct Model {
     checkout_action_idx: usize,
     delete_action_idx: usize,
     filter_action_idx: usize,
-    pub close_popup_action: Action<Command>,
-    pub cancel_task_action: Action<Command>,
+    pub close_action: Action<Command>,
+    pub cancel_action: Action<Command>,
     repo_model: RepositoryModel,
     pub table_state: TableState,
     pub app_state: AppState,
@@ -71,7 +82,7 @@ impl Model {
         actions.push(Action::new(
             "Delete".into(),
             KeyCode::Char('d'),
-            Command::Delete,
+            Command::AskDeleteBranch,
         ));
 
         let filter_action_idx = actions.len();
@@ -98,15 +109,15 @@ impl Model {
             KeyCode::Char('q'),
             Command::Quit,
         ));
-        let cancel_task_action = Action::new("Cancel".into(), KeyCode::Esc, Command::CancelTask);
-        let close_popup_action = Action::new("Close".into(), KeyCode::Esc, Command::ClosePopup);
+        let cancel_action = Action::new("Cancel".into(), KeyCode::Esc, Command::Cancel);
+        let close_action = Action::new("Close".into(), KeyCode::Esc, Command::ClosePopup);
         Self {
             actions,
             checkout_action_idx,
             delete_action_idx,
             filter_action_idx,
-            cancel_task_action,
-            close_popup_action,
+            cancel_action,
+            close_action,
             repo_model: RepositoryModel::new(path),
             table_state: TableState::default(),
             app_state: AppState::Normal,
@@ -227,7 +238,6 @@ impl Model {
             .current_branch()
             .expect("delete() should not be callable without an active branch")
             .name;
-        // TODO show confirmation popup if deleting the branch is not safe
         if let Err(error) = self.repo_model.delete_branch(name) {
             self.app_state = AppState::Error(format!("{}", error));
             return;
@@ -239,6 +249,7 @@ impl Model {
         }
         self.update_branches()
             .expect("update_branches() should not fail after a successful delete");
+        self.app_state = AppState::Normal;
     }
 
     pub fn sync(&mut self) {
@@ -260,6 +271,42 @@ impl Model {
 
     pub fn set_sort_by(&mut self, sort_by: SortBy) {
         self.repo_model.set_sort_by(sort_by)
+    }
+
+    pub fn need_confirmation_to_delete(&self) -> bool {
+        true // TODO: skip confirmation when possible
+    }
+
+    pub fn ask_delete_confirmation(&mut self) {
+        self.app_state = AppState::Confirm {
+            message: "Are you sure you want to delete this branch?".into(), // TODO: explain why we ask
+            on_cancel: self.cancel_action.clone(),
+            on_confirm: create_confirm_action("Delete branch".into(), Command::DoDeleteBranch),
+        };
+    }
+
+    pub fn process_command(&mut self, command: Command) {
+        match command {
+            Command::Checkout => self.checkout(),
+            Command::Quit => self.quit(),
+            Command::Filter => self.app_state = AppState::EditFilter,
+            Command::AskDeleteBranch => {
+                if self.need_confirmation_to_delete() {
+                    self.ask_delete_confirmation()
+                } else {
+                    self.delete()
+                }
+            }
+            Command::Sync => self.sync(),
+            Command::Sort => self.app_state = AppState::EditSort,
+            Command::Cancel => {
+                self.app_state = AppState::Normal;
+            }
+            Command::DoDeleteBranch => {
+                self.delete();
+            }
+            _ => {}
+        }
     }
 }
 

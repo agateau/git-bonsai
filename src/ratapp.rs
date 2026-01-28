@@ -189,11 +189,12 @@ impl App {
             return;
         };
         let action = if task.success().is_some() {
-            &self.model.close_popup_action
+            &self.model.close_action
         } else {
-            &self.model.cancel_task_action
+            &self.model.cancel_action
         };
-        let popup = Popup::new(action)
+        let popup = Popup::default()
+            .actions(vec![action.clone()])
             .title(task.title())
             .content(Text::raw(task.output()));
 
@@ -213,9 +214,35 @@ impl App {
         let AppState::Error(ref error) = self.model.app_state else {
             return;
         };
-        let popup = Popup::new(&self.model.close_popup_action)
+        let popup = Popup::default()
+            .actions(vec![self.model.close_action.clone()])
             .title("Error")
             .content(Text::raw(error));
+
+        let frame_area = frame.area();
+        let area = Rect {
+            x: frame_area.width / 3,
+            y: frame_area.height / 4,
+            width: frame_area.width / 3,
+            height: frame_area.height / 4,
+        };
+
+        frame.render_widget(popup, area);
+    }
+
+    fn render_confirm_popup(&mut self, frame: &mut Frame) {
+        let AppState::Confirm {
+            ref message,
+            ref on_confirm,
+            ref on_cancel,
+        } = self.model.app_state
+        else {
+            return;
+        };
+        let popup = Popup::default()
+            .actions(vec![on_cancel.clone(), on_confirm.clone()])
+            .title("Confirm")
+            .content(Text::raw(message));
 
         let frame_area = frame.area();
         let area = Rect {
@@ -250,6 +277,9 @@ impl App {
         self.render_branch_table(frame, content);
         self.render_progress_popup(frame);
         self.render_error_popup(frame);
+        self.render_confirm_popup(frame);
+
+        // Toolbar
         match &self.model.app_state {
             AppState::EditFilter => {
                 self.render_filter_bar(frame, footer, self.model.filter().into())
@@ -273,18 +303,25 @@ impl App {
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
-        match self.model.app_state {
+        match &self.model.app_state {
             AppState::Error(_) => {
                 self.handle_error_key_event(key_event);
             }
             AppState::Normal => {
-                self.handle_normal_key_event(key_event);
+                self.handle_action_key_event(key_event, &self.model.actions.clone());
             }
             AppState::EditFilter => {
                 self.handle_edit_filter_key_event(key_event);
             }
             AppState::EditSort => {
                 self.handle_edit_sort_key_event(key_event);
+            }
+            AppState::Confirm {
+                on_cancel,
+                on_confirm,
+                ..
+            } => {
+                self.handle_action_key_event(key_event, &[on_cancel.clone(), on_confirm.clone()]);
             }
             AppState::Exiting => {}
             AppState::RunningTask { task: _ } => {
@@ -293,21 +330,11 @@ impl App {
         }
     }
 
-    fn handle_normal_key_event(&mut self, key_event: KeyEvent) {
-        for action in &self.model.actions {
+    fn handle_action_key_event(&mut self, key_event: KeyEvent, actions: &[Action<Command>]) {
+        for action in actions {
             if action.keycode == key_event.code {
                 if action.enabled {
-                    match action.command {
-                        Command::Checkout => self.model.checkout(),
-                        Command::Quit => self.model.quit(),
-                        Command::Filter => self.model.app_state = AppState::EditFilter,
-                        Command::Delete => self.model.delete(),
-                        Command::Sync => self.model.sync(),
-                        Command::Sort => self.model.app_state = AppState::EditSort,
-                        Command::ClosePopup | Command::CancelTask => {
-                            panic!("Unexpected command: {:?}", action.command)
-                        }
-                    }
+                    self.model.process_command(action.command);
                 }
                 return;
             }
@@ -324,7 +351,7 @@ impl App {
     }
 
     fn handle_error_key_event(&mut self, key_event: KeyEvent) {
-        if self.model.close_popup_action.keycode == key_event.code {
+        if self.model.close_action.keycode == key_event.code {
             self.model.app_state = AppState::Normal;
         }
     }
@@ -380,7 +407,7 @@ impl App {
     }
 
     fn handle_running_task_key_event(&mut self, key_event: KeyEvent) {
-        if key_event.code == self.model.cancel_task_action.keycode {
+        if key_event.code == self.model.cancel_action.keycode {
             self.model.stop_task();
         }
     }

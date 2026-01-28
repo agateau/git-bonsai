@@ -10,35 +10,47 @@ use ratatui::{
 use crate::{action::Action, uiutils};
 
 #[derive(Debug, Setters)]
-pub struct Popup<'a, T> {
+pub struct Popup<'a, T>
+where
+    T: Clone,
+{
     #[setters(into)]
     title: Line<'a>,
     #[setters(into)]
     content: Text<'a>,
+    #[setters()]
+    actions: Vec<Action<T>>,
     title_style: Style,
     style: Style,
-    close_action: &'a Action<T>,
 }
 
-impl<'a, T> Popup<'a, T> {
-    pub fn new(close_action: &'a Action<T>) -> Self {
+impl<'a, T> Default for Popup<'a, T>
+where
+    T: Clone,
+{
+    fn default() -> Self {
         Self {
             title: Line::default(),
             content: Text::default(),
             title_style: Style::default(),
             style: Style::default(),
-            close_action,
+            actions: vec![],
         }
     }
 }
 
-impl<T> Widget for Popup<'_, T> {
+impl<T> Widget for Popup<'_, T>
+where
+    T: Clone,
+{
     fn render(self, area: Rect, buf: &mut Buffer) {
         Clear.render(area, buf);
-        let close_spans = uiutils::create_spans_for_action(self.close_action);
+
+        let spans = uiutils::create_spans_for_actions(&self.actions);
+
         let block = Block::new()
             .title(Line::from(format!(" {} ", self.title)).centered())
-            .title_bottom(Line::from(close_spans).right_aligned())
+            .title_bottom(Line::from(spans).right_aligned())
             .title_style(self.title_style)
             .borders(Borders::ALL)
             .border_style(uiutils::DIM_STYLE)

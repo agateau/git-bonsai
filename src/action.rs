@@ -5,14 +5,20 @@
 use crossterm::event::KeyCode;
 
 #[derive(Debug, Clone)]
-pub struct Action<T> {
+pub struct Action<T>
+where
+    T: Clone,
+{
     pub name: String,
     pub keycode: KeyCode,
     pub enabled: bool,
     pub command: T,
 }
 
-impl<T> Action<T> {
+impl<T> Action<T>
+where
+    T: Clone,
+{
     pub fn new(name: String, keycode: KeyCode, command: T) -> Self {
         Self {
             name,

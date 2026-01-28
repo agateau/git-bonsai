@@ -29,7 +29,10 @@ pub fn format_datetime(datetime: &DateTime<FixedOffset>) -> String {
 }
 
 /// Create a styled vec of spans representing an action and its shortcut
-pub fn create_spans_for_action<T>(action: &Action<T>) -> Vec<Span<'_>> {
+pub fn create_spans_for_action<T>(action: &Action<T>) -> Vec<Span<'_>>
+where
+    T: Clone,
+{
     let name = &action.name;
     let keycode = action.keycode;
     let enabled = action.enabled;
@@ -48,15 +51,25 @@ pub fn create_spans_for_action<T>(action: &Action<T>) -> Vec<Span<'_>> {
     ]
 }
 
-pub fn render_toolbar<T>(frame: &mut Frame, area: Rect, actions: &[Action<T>]) {
-    let spans: Vec<Span> = actions
+pub fn create_spans_for_actions<T>(actions: &[Action<T>]) -> Vec<Span<'_>>
+where
+    T: Clone,
+{
+    actions
         .iter()
         .flat_map(|x| {
             let mut action_spans = create_spans_for_action(x);
             action_spans.push(Span::styled("─", DIM_STYLE));
             action_spans
         })
-        .collect();
+        .collect()
+}
+
+pub fn render_toolbar<T>(frame: &mut Frame, area: Rect, actions: &[Action<T>])
+where
+    T: Clone,
+{
+    let spans = create_spans_for_actions(actions);
 
     let toolbar = Line::from(spans);
     let toolbar_end = toolbar.width() as u16;
