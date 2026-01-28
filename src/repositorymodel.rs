@@ -189,6 +189,7 @@ impl RepositoryModel {
         &self.branches
     }
 
+    /// Returns the list of branches that contain `branch`. Can be None if we don't have the list yet.
     pub fn branches_containing(&self, branch: &str) -> Option<&Vec<String>> {
         self.branches_containing.get(branch)
     }
