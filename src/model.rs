@@ -2,15 +2,16 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use git::{Branch, CheckoutState, GitResult};
+use git::{AheadBehindStatus, Branch, CheckoutState, GitResult};
 
 use crate::action::Action;
 use crate::repositorymodel::{RepositoryModel, SortBy};
 use crate::task::Task;
 
 use ratatui::widgets::TableState;
-use std::cmp;
 use std::path::Path;
+use std::time::Duration;
+use std::{cmp, thread};
 
 use crossterm::event::KeyCode;
 
@@ -273,13 +274,41 @@ impl Model {
         self.repo_model.set_sort_by(sort_by)
     }
 
-    pub fn need_confirmation_to_delete(&self) -> bool {
-        true // TODO: skip confirmation when possible
+    /// Return a reason to confirm deletion if it's not safe to delete the branch
+    pub fn get_reason_to_confirm_delete(&self) -> Option<String> {
+        let branch = self.current_branch().unwrap();
+
+        // If another branch contains `branch`, no need to confirm delete
+        let mut is_contained: Option<bool> = None;
+        while is_contained.is_none() {
+            // Maybe show a waiting popup?
+            thread::sleep(Duration::from_millis(100));
+            is_contained = self
+                .repo_model
+                .branches_containing(&branch.name)
+                .map(|x| !x.is_empty());
+        }
+        if is_contained == Some(true) {
+            return None;
+        }
+
+        let Some(ref upstream) = branch.upstream else {
+            return Some("It has never been pushed.".into());
+        };
+        let Some(ref ahead_behind) = upstream.ahead_behind else {
+            // TODO: maybe return None for gone branches?
+            return Some("Its upstream branch has been deleted.".into());
+        };
+        match ahead_behind.status() {
+            AheadBehindStatus::UpToDate | AheadBehindStatus::Behind => None,
+            AheadBehindStatus::Diverged => Some("It has diverged from its upstream branch.".into()),
+            AheadBehindStatus::Ahead => Some("It is ahead of its upstream branch.".into()),
+        }
     }
 
-    pub fn ask_delete_confirmation(&mut self) {
+    pub fn confirm_delete(&mut self, reason: String) {
         self.app_state = AppState::Confirm {
-            message: "Are you sure you want to delete this branch?".into(), // TODO: explain why we ask
+            message: format!("Are you sure you want to delete this branch?\n\n{reason}"),
             on_cancel: self.cancel_action.clone(),
             on_confirm: create_confirm_action("Delete branch".into(), Command::DoDeleteBranch),
         };
@@ -291,8 +320,8 @@ impl Model {
             Command::Quit => self.quit(),
             Command::Filter => self.app_state = AppState::EditFilter,
             Command::AskDeleteBranch => {
-                if self.need_confirmation_to_delete() {
-                    self.ask_delete_confirmation()
+                if let Some(reason) = self.get_reason_to_confirm_delete() {
+                    self.confirm_delete(reason)
                 } else {
                     self.delete()
                 }
