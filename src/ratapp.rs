@@ -95,8 +95,7 @@ impl App {
                         (name.clone(), get_ahead_behind_str(ahead_behind))
                     }
                 };
-                let contained_in_str: String = match self.model.branches_contained_in(&branch.name)
-                {
+                let contained_in_str: String = match self.model.branches_containing(&branch.name) {
                     // We don't know yet
                     None => "...".into(),
                     // We have the info

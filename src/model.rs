@@ -137,8 +137,8 @@ impl Model {
         self.repo_model.branches()
     }
 
-    pub fn branches_contained_in(&self, branch: &str) -> Option<&Vec<String>> {
-        self.repo_model.branches_contained_in(branch)
+    pub fn branches_containing(&self, branch: &str) -> Option<&Vec<String>> {
+        self.repo_model.branches_containing(branch)
     }
 
     pub fn update(&mut self) {

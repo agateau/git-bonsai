@@ -14,12 +14,12 @@ use crate::gitsynctask::GitSyncTask;
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Request {
     Stop,
-    BranchesContainedIn(String),
+    BranchesContaining(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Response {
-    BranchesContainedIn {
+    BranchesContaining {
         name: String,
         contained_in: Vec<String>,
     },
@@ -72,7 +72,7 @@ pub struct RepositoryModel {
     all_branches: Vec<Branch>,
     /// The filtered branches
     branches: Vec<Branch>,
-    branches_contained_in: HashMap<String, Vec<String>>,
+    branches_containing: HashMap<String, Vec<String>>,
     request_tx: mpsc::Sender<Request>,
     response_rx: mpsc::Receiver<Response>,
     sort_by: SortBy,
@@ -91,7 +91,7 @@ impl RepositoryModel {
                     Request::Stop => {
                         return;
                     }
-                    Request::BranchesContainedIn(name) => {
+                    Request::BranchesContaining(name) => {
                         let Ok(contained_in) = worker_repo.list_branches_containing(&name) else {
                             // Failure can happen if the branch has just been removed. Ignore it.
                             continue;
@@ -100,7 +100,7 @@ impl RepositoryModel {
                         let contained_in =
                             contained_in.into_iter().filter(|x| *x != name).collect();
                         response_tx
-                            .send(Response::BranchesContainedIn { name, contained_in })
+                            .send(Response::BranchesContaining { name, contained_in })
                             .unwrap();
                     }
                 }
@@ -112,7 +112,7 @@ impl RepositoryModel {
             filter: "".into(),
             all_branches: vec![],
             branches: vec![],
-            branches_contained_in: HashMap::new(),
+            branches_containing: HashMap::new(),
             request_tx,
             response_rx,
             sort_by: SortBy {
@@ -167,9 +167,9 @@ impl RepositoryModel {
         self.all_branches = self.repo.list_branches()?;
         self.apply_filter();
 
-        self.branches_contained_in.clear();
+        self.branches_containing.clear();
         for branch in &self.branches {
-            let msg = Request::BranchesContainedIn(branch.name.clone());
+            let msg = Request::BranchesContaining(branch.name.clone());
             self.request_tx.send(msg).unwrap();
         }
         Ok(())
@@ -178,8 +178,8 @@ impl RepositoryModel {
     pub fn update(&mut self) {
         while let Ok(response) = self.response_rx.try_recv() {
             match response {
-                Response::BranchesContainedIn { name, contained_in } => {
-                    self.branches_contained_in.insert(name, contained_in);
+                Response::BranchesContaining { name, contained_in } => {
+                    self.branches_containing.insert(name, contained_in);
                 }
             }
         }
@@ -189,8 +189,8 @@ impl RepositoryModel {
         &self.branches
     }
 
-    pub fn branches_contained_in(&self, branch: &str) -> Option<&Vec<String>> {
-        self.branches_contained_in.get(branch)
+    pub fn branches_containing(&self, branch: &str) -> Option<&Vec<String>> {
+        self.branches_containing.get(branch)
     }
 
     pub fn checkout(&self, branch: &str) -> GitResult<()> {
