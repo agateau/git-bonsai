@@ -105,6 +105,7 @@ pub enum CheckoutState {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Upstream {
     pub name: String,
+    /// Can be None if the remote branch is gone
     pub ahead_behind: Option<AheadBehind>,
 }
 
