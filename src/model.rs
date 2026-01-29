@@ -132,6 +132,23 @@ impl Model {
 
     pub fn set_filter(&mut self, value: &str) {
         self.repo_model.set_filter(value);
+        let visible_branch_count = self.branches().len();
+        if visible_branch_count == 0 {
+            self.table_state.select(None);
+        } else {
+            match self.table_state.selected() {
+                None => {
+                    if visible_branch_count > 0 {
+                        self.table_state.select(Some(0));
+                    }
+                }
+                Some(x) => {
+                    if x >= visible_branch_count {
+                        self.table_state.select(Some(visible_branch_count - 1));
+                    }
+                }
+            }
+        }
     }
 
     pub fn branches(&self) -> &Vec<Branch> {
@@ -345,6 +362,11 @@ mod test {
 
     use crate::model::Model;
 
+    fn create_empty_commit(repo: &Repository) {
+        repo.git("commit", &["-m", "empty", "--allow-empty"])
+            .unwrap();
+    }
+
     #[test]
     fn delete_last_branch() {
         // GIVEN a source repository with two branches
@@ -352,8 +374,7 @@ mod test {
 
         let repo = Repository::new(&tmp_dir);
         repo.init().unwrap();
-        repo.git("commit", &["-m", "empty", "--allow-empty"])
-            .unwrap();
+        create_empty_commit(&repo);
         repo.create_branch("z").unwrap();
         repo.checkout(INITIAL_BRANCH).unwrap();
 
@@ -375,5 +396,62 @@ mod test {
 
         // AND the first branch is selected
         assert_eq!(model.table_state.selected(), Some(0));
+    }
+
+    #[test]
+    fn filter_out_current_branch() {
+        // GIVEN a source repository with 3 branches
+        let tmp_dir = assert_fs::TempDir::new().unwrap();
+
+        let repo = Repository::new(&tmp_dir);
+        repo.init().unwrap();
+        create_empty_commit(&repo);
+        repo.git("branch", &["-m", "x1"]).unwrap();
+        repo.create_branch("x2").unwrap();
+        repo.create_branch("y").unwrap();
+
+        // AND a model on this repo
+        let mut model = Model::new(&tmp_dir);
+        model.update_branches().unwrap();
+        assert_eq!(model.branches().len(), 3);
+
+        // AND the 3rd one is selected
+        model.table_state.select(Some(2));
+        let branch = model.current_branch().unwrap();
+        assert_eq!(branch.name, "y");
+
+        // WHEN the filter hides the 3rd branch
+        model.set_filter("x");
+
+        // THEN the 2nd branch is selected
+        let branch = model.current_branch().unwrap();
+        assert_eq!(branch.name, "x2");
+    }
+
+    #[test]
+    fn filter_out_all_branches() {
+        // GIVEN a source repository
+        let tmp_dir = assert_fs::TempDir::new().unwrap();
+
+        let repo = Repository::new(&tmp_dir);
+        repo.init().unwrap();
+        repo.git("branch", &["-m", "x"]).unwrap();
+        create_empty_commit(&repo);
+
+        // AND a model on this repo
+        let mut model = Model::new(&tmp_dir);
+        model.update_branches().unwrap();
+        assert_eq!(model.branches().len(), 1);
+
+        // AND the branch is selected
+        model.table_state.select(Some(0));
+        let branch = model.current_branch().unwrap();
+        assert_eq!(branch.name, "x");
+
+        // WHEN the filter hides the branch
+        model.set_filter("y");
+
+        // THEN no branches are selected
+        assert_eq!(model.current_branch(), None);
     }
 }
