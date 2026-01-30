@@ -4,6 +4,7 @@
 
 use chrono::{DateTime, FixedOffset, Utc};
 
+use crossterm::event::KeyCode;
 use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
@@ -40,6 +41,14 @@ where
     let keycode = action.keycode;
     let enabled = action.enabled;
 
+    let keycode_str: String = match keycode {
+        KeyCode::Left => "←".into(),
+        KeyCode::Right => "→".into(),
+        KeyCode::Up => "↑".into(),
+        KeyCode::Down => "↓".into(),
+        _ => format!("{}", keycode),
+    };
+
     vec![
         Span::styled("┤", DIM_STYLE),
         Span::styled(
@@ -52,7 +61,7 @@ where
         ),
         Span::styled(" (", DIM_STYLE),
         Span::styled(
-            format!("{}", keycode),
+            keycode_str,
             if enabled {
                 ACTION_SHORTCUT_STYLE
             } else {
