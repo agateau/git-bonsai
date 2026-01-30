@@ -12,6 +12,9 @@ use ratatui::Frame;
 use crate::action::Action;
 
 pub const DIM_STYLE: Style = Style::new().dark_gray();
+// TODO: handle light backgrounds
+pub const ACTION_SHORTCUT_STYLE: Style = Style::new().yellow();
+pub const ACTION_TEXT_STYLE: Style = Style::new().white();
 
 pub fn format_datetime(datetime: &DateTime<FixedOffset>) -> String {
     let delta = datetime.signed_duration_since(Utc::now());
@@ -36,16 +39,25 @@ where
     let name = &action.name;
     let keycode = action.keycode;
     let enabled = action.enabled;
-    let text_style = Style::new();
-    let shortcut_style = Style::new().yellow();
 
     vec![
         Span::styled("┤", DIM_STYLE),
-        Span::styled(name, if enabled { text_style } else { DIM_STYLE }),
+        Span::styled(
+            name,
+            if enabled {
+                ACTION_TEXT_STYLE
+            } else {
+                DIM_STYLE
+            },
+        ),
         Span::styled(" (", DIM_STYLE),
         Span::styled(
             format!("{}", keycode),
-            if enabled { shortcut_style } else { DIM_STYLE },
+            if enabled {
+                ACTION_SHORTCUT_STYLE
+            } else {
+                DIM_STYLE
+            },
         ),
         Span::styled(")├", DIM_STYLE),
     ]
