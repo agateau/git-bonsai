@@ -7,7 +7,7 @@ use std::path::Path;
 use std::sync::mpsc;
 use std::thread;
 
-use git::{Branch, GitResult, Repository};
+use git::{AheadBehindStatus, Branch, GitResult, Repository};
 
 use crate::gitsynctask::GitSyncTask;
 
@@ -29,9 +29,10 @@ enum Response {
 pub enum Column {
     Name,
     LastCommit,
+    Status,
 }
 
-const COLUMNS: &[Column; 2] = &[Column::Name, Column::LastCommit];
+const COLUMNS: &[Column; 3] = &[Column::Name, Column::LastCommit, Column::Status];
 
 impl Column {
     pub fn next(&self) -> Self {
@@ -62,6 +63,21 @@ impl Column {
 pub struct SortBy {
     pub column: Column,
     pub ascending: bool,
+}
+
+fn get_status_key(branch: &Branch) -> usize {
+    let Some(ref upstream) = branch.upstream else {
+        return 0;
+    };
+    let Some(ref ahead_behind) = upstream.ahead_behind else {
+        return 1;
+    };
+    match ahead_behind.status() {
+        AheadBehindStatus::Diverged => 2,
+        AheadBehindStatus::Ahead => 3,
+        AheadBehindStatus::UpToDate => 4,
+        AheadBehindStatus::Behind => 5,
+    }
 }
 
 /// Knows the branch of a git repository, and can fetch info about them
@@ -157,6 +173,7 @@ impl RepositoryModel {
         match self.sort_by.column {
             Column::Name => self.branches.sort_by_key(|x| x.name.clone()),
             Column::LastCommit => self.branches.sort_by_key(|x| x.last_commit_date),
+            Column::Status => self.branches.sort_by_key(get_status_key),
         }
         if !self.sort_by.ascending {
             self.branches.reverse();

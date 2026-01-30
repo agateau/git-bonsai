@@ -167,7 +167,7 @@ impl App {
                     Span::raw(" "),
                     format_column("Name", Column::Name),
                     format_column("Last commit", Column::LastCommit),
-                    Span::raw("Status"),
+                    format_column("Status", Column::Status),
                     Span::raw("Upstream"),
                     Span::raw("Contained in"),
                 ])
