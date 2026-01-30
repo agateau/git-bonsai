@@ -24,10 +24,6 @@ use std::process::Command;
 use chrono::{DateTime, FixedOffset};
 use thiserror::Error;
 
-// If a branch is checked out in a separate worktree, then `git branch` prefixes it with this
-// string
-const WORKTREE_BRANCH_PREFIX: &str = "+ ";
-
 // Used by test code when creating repositories.
 // Use neither `main` nor `master` to ensure we do not depend on the local setting for the initial
 // branch.
@@ -258,9 +254,6 @@ impl Repository {
         let stdout = self.git("branch", args)?;
 
         for line in stdout.lines() {
-            if line.starts_with(WORKTREE_BRANCH_PREFIX) {
-                continue;
-            }
             let Some(branch) = line.get(2..) else {
                 let msg = format!("invalid line in `git branch` output: {line}");
                 return Err(GitError::UnexpectedOutput(msg));
