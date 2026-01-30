@@ -4,9 +4,9 @@
 
 use git::{AheadBehindStatus, Branch, CheckoutState, GitResult};
 
-use crate::action::Action;
 use crate::repositorymodel::{RepositoryModel, SortBy};
 use crate::task::Task;
+use crate::ui::action::Action;
 
 use ratatui::widgets::TableState;
 use std::path::Path;

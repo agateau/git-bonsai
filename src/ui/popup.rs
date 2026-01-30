@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Aurélien Gâteau <mail@agateau.com>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use derive_setters::Setters;
 use ratatui::{
     buffer::Buffer,
@@ -7,7 +11,7 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, Paragraph, Widget, Wrap},
 };
 
-use crate::{action::Action, uiutils};
+use crate::ui::{action::Action, uiutils};
 
 #[derive(Debug, Setters)]
 pub struct Popup<'a, T>

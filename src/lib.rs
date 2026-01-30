@@ -16,14 +16,12 @@
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-pub mod action;
 pub mod cliargs;
 pub mod gitsynctask;
 pub mod logger;
 pub mod model;
-pub mod popup;
 pub mod ratapp;
 pub mod repositorymodel;
 pub mod task;
-pub mod uiutils;
+pub mod ui;
 pub mod worker;

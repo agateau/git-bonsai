@@ -9,7 +9,7 @@ use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::Frame;
 
-use crate::action::Action;
+use crate::ui::action::Action;
 
 pub const DIM_STYLE: Style = Style::new().dark_gray();
 // TODO: handle light backgrounds

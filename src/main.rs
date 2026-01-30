@@ -18,16 +18,14 @@
  */
 use structopt::StructOpt;
 
-mod action;
 mod cliargs;
 mod gitsynctask;
 mod logger;
 mod model;
-mod popup;
 mod ratapp;
 mod repositorymodel;
 mod task;
-mod uiutils;
+mod ui;
 mod worker;
 
 use cliargs::CliArgs;

@@ -16,12 +16,11 @@ use ratatui::Frame;
 
 use git::{AheadBehind, AheadBehindStatus, CheckoutState, Upstream};
 
-use crate::action::Action;
 use crate::cliargs::CliArgs;
 use crate::model::{AppState, Command, Model};
-use crate::popup::Popup;
 use crate::repositorymodel::Column;
-use crate::uiutils;
+use crate::ui::action::Action;
+use crate::ui::{popup::Popup, uiutils};
 
 // Wait that long for an input event before redrawing the screen
 const EVENT_POLL_DURATION: Duration = Duration::from_millis(32);
