@@ -22,26 +22,7 @@ use structopt::StructOpt;
 
 #[derive(StructOpt)]
 /// Keep a git repository clean and tidy.
-///
-/// Branches can be declared as protected from suppression using `git config --add
-/// git-bonsai.protected-branches <branch>`.
 pub struct CliArgs {
-    /// Other branches to protect from suppression.
-    #[structopt(short = "x", long)]
-    pub excluded: Vec<String>,
-
-    /// Do not fetch changes
-    #[structopt(long = "no-fetch")]
-    pub no_fetch: bool,
-
-    /// Do not ask for confirmation
-    #[structopt(short = "y", long = "yes")]
-    pub yes: bool,
-
-    /// Use ratatui UI
-    #[structopt(short = "r", long = "ratatui")]
-    pub ratatui: bool,
-
     /// Log to file
     #[structopt(short = "l", long = "log")]
     pub log_path: Option<PathBuf>,

@@ -19,19 +19,14 @@
 use structopt::StructOpt;
 
 mod action;
-mod app;
-mod appui;
-mod batchappui;
 mod cliargs;
 mod gitsynctask;
-mod interactiveappui;
 mod logger;
 mod model;
 mod popup;
 mod ratapp;
 mod repositorymodel;
 mod task;
-mod tui;
 mod uiutils;
 mod worker;
 
@@ -43,11 +38,7 @@ fn main() {
         logger::setup_file_logger(log_path);
     }
     log::info!("Start");
-    let exit_code = if args.ratatui {
-        ratapp::run(args, ".")
-    } else {
-        app::run(args, ".")
-    };
+    let exit_code = ratapp::run(args, ".");
     log::info!("Stop");
     ::std::process::exit(exit_code);
 }
