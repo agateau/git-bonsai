@@ -18,15 +18,15 @@ pub const ACTION_SHORTCUT_STYLE: Style = Style::new().yellow();
 pub const ACTION_TEXT_STYLE: Style = Style::new().white();
 
 pub fn format_datetime(datetime: &DateTime<FixedOffset>) -> String {
-    let delta = datetime.signed_duration_since(Utc::now());
+    let delta = Utc::now().signed_duration_since(datetime);
     if delta.num_days() == 0 {
         return datetime.format("Today, %H:%M").to_string();
     }
-    if delta.num_days() > -7 {
+    if delta.num_days() < 7 {
         // Less than a week ago
         return datetime.format("%A, %H:%M").to_string();
     }
-    if delta.num_days() > -365 {
+    if delta.num_days() < 366 {
         return datetime.format("%b %d, %H:%M").to_string();
     }
     datetime.format("%Y %b %d, %H:%M").to_string()
