@@ -14,7 +14,7 @@ use crate::ui::action::Action;
 
 pub const DIM_STYLE: Style = Style::new().dark_gray();
 // TODO: handle light backgrounds
-pub const ACTION_SHORTCUT_STYLE: Style = Style::new().yellow();
+pub const ACTION_SHORTCUT_STYLE: Style = Style::new().yellow().bold();
 pub const ACTION_TEXT_STYLE: Style = Style::new().white();
 
 pub fn format_datetime(datetime: &DateTime<FixedOffset>) -> String {
@@ -42,15 +42,25 @@ where
     let enabled = action.enabled;
 
     let keycode_str: String = match keycode {
-        KeyCode::Left => "←".into(),
-        KeyCode::Right => "→".into(),
-        KeyCode::Up => "↑".into(),
-        KeyCode::Down => "↓".into(),
+        KeyCode::Left => "🠤".into(),
+        KeyCode::Right => "🠦".into(),
+        KeyCode::Up => "🠥".into(),
+        KeyCode::Down => "🠧".into(),
+        KeyCode::Enter => "↵".into(),
         _ => format!("{}", keycode),
     };
 
     vec![
-        Span::styled("┤", DIM_STYLE),
+        Span::raw(" "),
+        Span::styled(
+            format!("[{}]", keycode_str),
+            if enabled {
+                ACTION_SHORTCUT_STYLE
+            } else {
+                DIM_STYLE
+            },
+        ),
+        Span::raw(" "),
         Span::styled(
             name,
             if enabled {
@@ -59,16 +69,7 @@ where
                 DIM_STYLE
             },
         ),
-        Span::styled(" (", DIM_STYLE),
-        Span::styled(
-            keycode_str,
-            if enabled {
-                ACTION_SHORTCUT_STYLE
-            } else {
-                DIM_STYLE
-            },
-        ),
-        Span::styled(")├", DIM_STYLE),
+        Span::raw(" "),
     ]
 }
 
@@ -78,12 +79,9 @@ where
 {
     actions
         .iter()
-        .flat_map(|x| {
-            let mut action_spans = create_spans_for_action(x);
-            action_spans.push(Span::styled("─", DIM_STYLE));
-            action_spans
-        })
-        .collect()
+        .map(create_spans_for_action)
+        .collect::<Vec<Vec<Span<'_>>>>()
+        .join(&Span::styled("╱", DIM_STYLE))
 }
 
 pub fn render_toolbar<T>(frame: &mut Frame, area: Rect, actions: &[Action<T>])
@@ -93,17 +91,5 @@ where
     let spans = create_spans_for_actions(actions);
 
     let toolbar = Line::from(spans);
-    let toolbar_end = toolbar.width() as u16;
     frame.render_widget(toolbar, area);
-
-    let padding = area.width - toolbar_end;
-    frame.render_widget(
-        Line::styled("─".repeat(padding as usize), DIM_STYLE),
-        Rect {
-            x: toolbar_end,
-            y: area.y,
-            width: padding,
-            height: 1,
-        },
-    );
 }
