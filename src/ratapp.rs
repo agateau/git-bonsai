@@ -307,6 +307,7 @@ impl App {
             }
             AppState::Normal => {
                 self.handle_action_key_event(key_event, &self.model.actions.clone());
+                self.handle_branch_table_navigation_key_event(key_event);
             }
             AppState::EditFilter => {
                 self.handle_edit_filter_key_event(key_event);
@@ -337,6 +338,9 @@ impl App {
                 return;
             }
         }
+    }
+
+    fn handle_branch_table_navigation_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Up => self.model.move_up(),
             KeyCode::Down => self.model.move_down(),
