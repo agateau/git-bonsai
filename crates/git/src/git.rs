@@ -248,46 +248,8 @@ impl Repository {
         Ok(())
     }
 
-    pub fn find_default_branch(&self) -> GitResult<String> {
-        let stdout = self.git("ls-remote", &["--symref", "origin", "HEAD"])?;
-        /* Output looks like this:
-         *
-         * ref: refs/heads/main\tHEAD
-         * 960389f1c69e8b9c3fe06d29866d0d193375a6cb\tHEAD
-         *
-         * We want the extra "main" from the first line
-         */
-        let line = stdout.lines().next().ok_or_else(|| {
-            GitError::UnexpectedOutput("ls-remote returned an empty string".to_string())
-        })?;
-
-        let line = line
-            .strip_prefix("ref: refs/heads/")
-            .ok_or_else(|| GitError::UnexpectedOutput("missing prefix".to_string()))?;
-
-        let line = line
-            .strip_suffix("\tHEAD")
-            .ok_or_else(|| GitError::UnexpectedOutput("missing suffix".to_string()))?;
-
-        Ok(line.to_string())
-    }
-
     pub fn list_branch_names(&self) -> GitResult<Vec<String>> {
         self.list_branches_internal(&[])
-    }
-
-    pub fn list_branches_with_sha1s(&self) -> GitResult<Vec<(String, String)>> {
-        let mut list: Vec<(String, String)> = Vec::new();
-
-        let lines = self.list_branches_internal(&["-v"])?;
-
-        for line in lines {
-            let mut it = line.split_whitespace();
-            let branch = it.next().unwrap().to_string();
-            let sha1 = it.next().unwrap().to_string();
-            list.push((branch, sha1));
-        }
-        Ok(list)
     }
 
     fn list_branches_internal(&self, args: &[&str]) -> GitResult<Vec<String>> {
@@ -310,20 +272,6 @@ impl Repository {
 
     pub fn list_branches_containing(&self, commit: &str) -> GitResult<Vec<String>> {
         self.list_branches_internal(&["--contains", commit])
-    }
-
-    pub fn list_tracking_branches(&self) -> GitResult<Vec<String>> {
-        let mut branches: Vec<String> = Vec::new();
-
-        let lines = self.list_branches_internal(&["-vv"])?;
-
-        for line in lines {
-            if line.contains("[origin/") && !line.contains(": gone]") {
-                let branch = line.split(' ').next();
-                branches.push(branch.unwrap().to_string());
-            }
-        }
-        Ok(branches)
     }
 
     pub fn list_branches(&self) -> GitResult<Vec<Branch>> {
@@ -366,12 +314,7 @@ impl Repository {
         None
     }
 
-    /// Update the current branch to its upstream if it can be fast-forwarded
-    pub fn fast_forward_current_branch(&self) -> GitResult<()> {
-        self.git("merge", &["--ff-only"])?;
-        Ok(())
-    }
-
+    /// Update `branch` to its upstream if it can be fast-forwarded
     pub fn fast_forward_branch(&self, branch: &Branch) -> GitResult<()> {
         let fail = || GitError::CannotBeFastForwarded(branch.name.clone());
         let upstream = branch.upstream.clone().ok_or(fail())?;
@@ -393,11 +336,6 @@ impl Repository {
             }
         };
         Ok(())
-    }
-
-    pub fn has_changes(&self) -> GitResult<bool> {
-        let out = self.git("status", &["--short"])?;
-        Ok(!out.is_empty())
     }
 
     pub fn get_current_sha1(&self) -> GitResult<String> {
@@ -584,30 +522,6 @@ mod tests {
     }
 
     #[test]
-    fn list_branches_with_sha1s() {
-        // GIVEN a repository with two branches
-        let dir = assert_fs::TempDir::new().unwrap();
-        let repo = create_test_repository(dir.path());
-
-        repo.create_branch("test").unwrap();
-        File::create(dir.path().join("test")).unwrap();
-        repo.add(&["test"]).unwrap();
-        repo.commit(&format!("Create file")).unwrap();
-
-        // WHEN I list branches with sha1
-        let branches_with_sha1 = repo.list_branches_with_sha1s().unwrap();
-
-        // THEN the list contains two entries
-        assert_eq!(branches_with_sha1.len(), 2);
-
-        // AND when switching to each branch, the current sha1 is the expected one
-        for (branch, sha1) in branches_with_sha1 {
-            repo.checkout(&branch).unwrap();
-            assert_eq!(repo.get_current_sha1().unwrap(), sha1);
-        }
-    }
-
-    #[test]
     fn list_branch_names_skip_worktree_branches() {
         // GIVEN a source repository with two branches
         let tmp_dir = assert_fs::TempDir::new().unwrap();
@@ -636,43 +550,6 @@ mod tests {
         // THEN it does not list worktree branches
         assert_eq!(branches.len(), 1);
         assert_eq!(branches, &[INITIAL_BRANCH]);
-    }
-
-    #[test]
-    fn find_default_branch_happy_path() {
-        // GIVEN a source repository
-        let tmp_dir = assert_fs::TempDir::new().unwrap();
-        let source_path = tmp_dir.path().join("source");
-        fs::create_dir_all(&source_path).unwrap();
-        create_test_repository(&source_path);
-
-        // AND a clone of this repository
-        let clone_path = tmp_dir.path().join("clone");
-        fs::create_dir_all(&clone_path).unwrap();
-        let clone_repo =
-            Repository::clone_repository(&clone_path, &source_path.to_str().unwrap()).unwrap();
-
-        // WHEN I call find_default_branch() on the clone
-        let branch = clone_repo.find_default_branch();
-
-        // THEN it finds the default branch name
-        assert_eq!(branch, Ok(INITIAL_BRANCH.to_string()));
-    }
-
-    #[test]
-    fn find_default_branch_no_remote() {
-        // GIVEN a repository without a remote
-        let tmp_dir = assert_fs::TempDir::new().unwrap();
-        let repo = create_test_repository(&tmp_dir.path());
-
-        // WHEN I call find_default_branch()
-        let err = repo.find_default_branch().unwrap_err();
-
-        // THEN it fails
-        match err {
-            GitError::CommandFailed { exit_code: 128, .. } => (),
-            e => panic!("unexpected error: {}", e),
-        };
     }
 
     #[test]
@@ -747,9 +624,6 @@ mod tests {
 
         // THEN the branch is fast-forwarded
         assert_eq!(local_repo.get_current_sha1().unwrap(), target_sha1);
-
-        // AND the working copy status is clean
-        assert!(!local_repo.has_changes().unwrap());
     }
 
     #[test]
