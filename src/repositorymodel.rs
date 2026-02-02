@@ -35,27 +35,21 @@ pub enum Column {
 const COLUMNS: &[Column; 3] = &[Column::Name, Column::LastCommit, Column::Status];
 
 impl Column {
+    fn position(&self) -> usize {
+        COLUMNS
+            .iter()
+            .position(|x| x == self)
+            .expect("Could not find myself in COLUMNS")
+    }
     pub fn next(&self) -> Self {
-        for (mut idx, value) in COLUMNS.iter().enumerate() {
-            if value == self {
-                idx = (idx + 1) % COLUMNS.len();
-                return COLUMNS[idx];
-            }
-        }
-        panic!("This should not happen");
+        let idx = self.position();
+        let idx = (idx + 1) % COLUMNS.len();
+        COLUMNS[idx]
     }
     pub fn prev(&self) -> Self {
-        for (mut idx, value) in COLUMNS.iter().enumerate() {
-            if value == self {
-                if idx == 0 {
-                    idx = COLUMNS.len() - 1;
-                } else {
-                    idx -= 1;
-                }
-                return COLUMNS[idx];
-            }
-        }
-        panic!("This should not happen");
+        let idx = self.position();
+        let idx = if idx == 0 { COLUMNS.len() - 1 } else { idx - 1 };
+        COLUMNS[idx]
     }
 }
 
