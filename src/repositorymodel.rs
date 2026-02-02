@@ -215,8 +215,9 @@ impl RepositoryModel {
         self.repo.checkout(branch)
     }
 
-    pub fn delete_branch(&self, branch: &str) -> GitResult<()> {
-        self.repo.delete_branch(branch)
+    pub fn delete_branch(&mut self, branch: &str) -> GitResult<()> {
+        self.repo.delete_branch(branch)?;
+        self.update_branches()
     }
 
     pub fn start_syncing(&self) -> GitSyncTask {

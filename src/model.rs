@@ -255,18 +255,17 @@ impl Model {
         let name = &self
             .current_branch()
             .expect("delete() should not be callable without an active branch")
-            .name;
+            .name
+            .clone();
         if let Err(error) = self.repo_model.delete_branch(name) {
             self.app_state = AppState::Error(format!("{}", error));
             return;
         }
         // Select the previous branch if we were on the last one
         let nb_branches = self.branches().len();
-        if self.table_state.selected() == Some(nb_branches - 1) {
-            self.table_state.select(Some(nb_branches - 2));
+        if self.table_state.selected() == Some(nb_branches) {
+            self.table_state.select(Some(nb_branches - 1));
         }
-        self.update_branches()
-            .expect("update_branches() should not fail after a successful delete");
         self.app_state = AppState::Normal;
     }
 
