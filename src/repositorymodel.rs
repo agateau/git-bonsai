@@ -215,9 +215,31 @@ impl RepositoryModel {
         self.repo.checkout(branch)
     }
 
-    pub fn delete_branch(&mut self, branch: &str) -> GitResult<()> {
-        self.repo.delete_branch(branch)?;
-        self.update_branches()
+    pub fn delete_branch(&mut self, branch_name: &str) -> GitResult<()> {
+        self.repo.delete_branch(branch_name)?;
+
+        // Remove branch_name from self.all_branches
+        // A given branch can only appear once so we can stop as soon as we find it
+        let idx = self.all_branches.iter().position(|x| x.name == branch_name);
+        if let Some(idx) = idx {
+            self.all_branches.remove(idx);
+        }
+
+        // Update self.branches
+        self.apply_filter();
+
+        // Remove branch_name from self.branches_containing, as a contained
+        // and as a container
+        // Similarly, a given branch can only appear once in the container list
+        // so we can stop as soon as we find it
+        self.branches_containing.remove(branch_name);
+        for (_, containers) in self.branches_containing.iter_mut() {
+            let idx = containers.iter().position(|x| x == branch_name);
+            if let Some(idx) = idx {
+                containers.remove(idx);
+            }
+        }
+        Ok(())
     }
 
     pub fn start_syncing(&self) -> GitSyncTask {
@@ -228,5 +250,72 @@ impl RepositoryModel {
 impl Drop for RepositoryModel {
     fn drop(&mut self) {
         self.request_tx.send(Request::Stop).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::{
+        thread,
+        time::{Duration, Instant},
+    };
+
+    use git::{Repository, INITIAL_BRANCH};
+
+    use crate::repositorymodel::RepositoryModel;
+
+    fn create_empty_commit(repo: &Repository) {
+        repo.git("commit", &["-m", "empty", "--allow-empty"])
+            .unwrap();
+    }
+
+    fn ensure_model_ready(model: &mut RepositoryModel) {
+        model.update_branches().unwrap();
+        let start = Instant::now();
+        while model.branches_containing.is_empty() {
+            model.update();
+            thread::sleep(Duration::from_millis(100));
+            assert!(start.elapsed().as_secs() < 2);
+        }
+    }
+
+    #[test]
+    fn delete_branch() {
+        // GIVEN a source repository
+        let tmp_dir = assert_fs::TempDir::new().unwrap();
+
+        let repo = Repository::new(&tmp_dir);
+        repo.init().unwrap();
+        create_empty_commit(&repo);
+
+        // AND a 2nd branch that contains the initial branch
+        repo.create_branch("x").unwrap();
+        create_empty_commit(&repo);
+
+        // AND a 3rd branch that contains the two others
+        repo.create_branch("y").unwrap();
+        create_empty_commit(&repo);
+
+        // AND a model on this repo
+        let mut model = RepositoryModel::new(&tmp_dir);
+        ensure_model_ready(&mut model);
+        assert_eq!(model.branches().len(), 3);
+
+        assert_eq!(
+            model.branches_containing(INITIAL_BRANCH),
+            Some(&vec!["x".to_string(), "y".to_string()])
+        );
+
+        // WHEN I delete x
+        model.delete_branch("x").unwrap();
+
+        // THEN the branch is deleted
+        assert_eq!(repo.list_branch_names().unwrap(), &[INITIAL_BRANCH, "y"]);
+
+        // AND x is not in the list of branches that contain INITIAL_BRANCH
+        assert_eq!(
+            model.branches_containing(INITIAL_BRANCH),
+            Some(&vec!["y".to_string()])
+        );
     }
 }
