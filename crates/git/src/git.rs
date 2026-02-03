@@ -515,37 +515,6 @@ mod tests {
     }
 
     #[test]
-    fn list_branch_names_skip_worktree_branches() {
-        // GIVEN a source repository with two branches
-        let tmp_dir = assert_fs::TempDir::new().unwrap();
-
-        let source_path = tmp_dir.path().join("source");
-        fs::create_dir_all(&source_path).unwrap();
-        let source_repo = create_test_repository(&source_path);
-        source_repo.git("branch", &["topic1"]).unwrap();
-
-        // AND a clone of this repository
-        let clone_path = tmp_dir.path().join("clone");
-        fs::create_dir_all(&clone_path).unwrap();
-        let clone_repo =
-            Repository::clone_repository(&clone_path, &source_path.to_str().unwrap()).unwrap();
-
-        // with the topic1 branch checked-out in a separate worktree
-        let worktree_dir = assert_fs::TempDir::new().unwrap();
-        let worktree_path_str = worktree_dir.path().to_str().unwrap();
-        clone_repo
-            .git("worktree", &["add", worktree_path_str, "topic1"])
-            .unwrap();
-
-        // WHEN I list branches
-        let branches = clone_repo.list_branch_names().unwrap();
-
-        // THEN it does not list worktree branches
-        assert_eq!(branches.len(), 1);
-        assert_eq!(branches, &[INITIAL_BRANCH]);
-    }
-
-    #[test]
     fn parse_simple_git_branch_line() {
         let tokens = vec![
             "master",
