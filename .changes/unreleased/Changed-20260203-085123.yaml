@@ -1,0 +1,3 @@
+kind: Changed
+body: Git-bonsai is now a TUI application! The core git operations are still there but the UI is totally different.
+time: 2026-02-03T08:51:23.691144313+01:00
