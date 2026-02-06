@@ -149,7 +149,9 @@ mod test {
             create_empty_commit(&local_repo);
             create_empty_commit(&local_repo);
             let target_sha1 = local_repo.get_current_sha1().unwrap();
-            local_repo.push().unwrap();
+            local_repo
+                .git("push", &["--set-upstream", "origin", &name])
+                .unwrap();
             local_repo.git("reset", &["--hard", "HEAD~2"]).unwrap();
 
             branch_and_target_sha1s.push((name, target_sha1));
