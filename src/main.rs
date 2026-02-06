@@ -18,17 +18,25 @@
  */
 use structopt::StructOpt;
 
-mod app;
-mod appui;
-mod batchappui;
 mod cliargs;
-mod git;
-mod interactiveappui;
-mod tui;
+mod gitsynctask;
+mod logger;
+mod model;
+mod ratapp;
+mod repositorymodel;
+mod task;
+mod ui;
+mod worker;
 
 use cliargs::CliArgs;
 
 fn main() {
     let args = CliArgs::from_args();
-    ::std::process::exit(app::run(args, "."));
+    if let Some(log_path) = &args.log_path {
+        logger::setup_file_logger(log_path);
+    }
+    log::info!("Start");
+    let exit_code = ratapp::run(args, ".");
+    log::info!("Stop");
+    ::std::process::exit(exit_code);
 }

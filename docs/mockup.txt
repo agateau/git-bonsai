@@ -1,0 +1,54 @@
+  Branch       Last commit            Status            Upstream          Suggested action
+
+* main         March 14, 11:22        Can be FF         origin/main       Fast-forward
++ prod         April 15, 09:23        Up-to-date        origin/prod
+  feat/foo     10:50                  Can be FF         origin/feat/foo   Fast-forward
+  fix/bar      Jan 12 2022, 12:34     Gone              origin/fix/bar    Delete
+  fix/baz      16:17                  Diverged          origin/fix/baz
+  fix/baz2     16:45                  In advance        origin/fix/baz2
+  frob         16:43                  Dup of fix/bar                      Delete
+  zouk         Feb 23, 10:45          Merged in main                      Delete
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────
+Git command output
+blah blah
+─────────────────┬────────────┬──────────┬────────────────┬──────────┬──────────────────────
+Fast-forward (f) │ Delete (d) │ Menu (m) │ "All" menu (a) │ Sort (s) │ Filter (/)
+
+
+┌───────────────────────────┐
+│ *Synchronizing*           │
+│                           │
+│ Fetching changes          │
+│ Fast-forwarding foo       │
+│ Fast-forwarding main      │
+│                           │
+│              Cancel (Esc) │
+└───────────────────────────┘
+
+
+┌───────────────────────────┐
+│ *Something went wrong*    │
+│ Blah blah                 │
+└───────────────────────────┘
+
+
+┌────Actions on current─────┐
+│ Fast-forward │ Rebase     │
+│ Delete                    │
+│ Push                      │
+│ Checkout                  │
+│ ───────────────────────── │
+│ Protect                   │
+└───────────────────────────┘
+
+
+┌───── Actions on all ──────┐
+│ Apply suggested actions   │
+│ Fast-forward              │
+│ Delete gone branches      │
+│ Delete merged branches    │
+│ Delete duplicate branches │
+└───────────────────────────┘

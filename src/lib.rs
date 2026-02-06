@@ -16,10 +16,12 @@
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-pub mod app;
-pub mod appui;
-pub mod batchappui;
 pub mod cliargs;
-pub mod git;
-pub mod interactiveappui;
-pub mod tui;
+pub mod gitsynctask;
+pub mod logger;
+pub mod model;
+pub mod ratapp;
+pub mod repositorymodel;
+pub mod task;
+pub mod ui;
+pub mod worker;
