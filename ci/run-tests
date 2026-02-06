@@ -1,4 +1,29 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
+
+cleanup() {
+    if [ -n "${TEMP_DIR:-}" ] ; then
+        echo "Deleting $TEMP_DIR"
+        rm -rf "$TEMP_DIR"
+    fi
+}
+
+create_temp_dir() {
+    TEMP_DIR="$(mktemp --tmpdir --directory "git-bonsai-tests-XXXXXX")"
+    trap cleanup INT TERM EXIT
+}
+
+# Create a separate git config so that tests are not affected by the local config
+setup_git_config() {
+    export GIT_CONFIG_NOSYSTEM=1
+    export GIT_CONFIG_GLOBAL=$TEMP_DIR/gitconfig
+
+    git config --global user.name "Git Bonsai Tests"
+    git config --global user.email "git-bonsai-tests@example.com"
+}
+
+create_temp_dir
+setup_git_config
+
 export RUST_BACKTRACE=1
 cargo test --verbose --workspace
