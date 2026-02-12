@@ -21,9 +21,8 @@ pub enum Command {
     AskDeleteBranch,
     Filter,
     Quit,
-    ClosePopup,
     Sync,
-    Cancel,
+    BackToNormal,
     Sort,
     DoDeleteBranch,
 }
@@ -51,6 +50,7 @@ pub enum AppState {
     Exiting,
     RunningTask {
         task: Box<dyn Task>,
+        on_success: Command,
     },
 }
 
@@ -110,8 +110,8 @@ impl Model {
             KeyCode::Char('q'),
             Command::Quit,
         ));
-        let cancel_action = Action::new("Cancel".into(), KeyCode::Esc, Command::Cancel);
-        let close_action = Action::new("Close".into(), KeyCode::Esc, Command::ClosePopup);
+        let cancel_action = Action::new("Cancel".into(), KeyCode::Esc, Command::BackToNormal);
+        let close_action = Action::new("Close".into(), KeyCode::Esc, Command::BackToNormal);
         Self {
             actions,
             checkout_action_idx,
@@ -161,8 +161,13 @@ impl Model {
 
     pub fn update(&mut self) {
         self.repo_model.update();
-        if let AppState::RunningTask { task } = &mut self.app_state {
+        if let AppState::RunningTask { task, on_success } = &mut self.app_state {
             task.update();
+            if task.success() == Some(true) {
+                log::info!("Running task successful");
+                let cmd = *on_success;
+                self.process_command(cmd);
+            }
         }
 
         let branch = self.current_branch();
@@ -272,7 +277,10 @@ impl Model {
     pub fn sync(&mut self) {
         let mut task: Box<dyn Task> = Box::new(self.repo_model.start_syncing());
         task.start();
-        self.app_state = AppState::RunningTask { task };
+        self.app_state = AppState::RunningTask {
+            task,
+            on_success: Command::BackToNormal,
+        };
     }
 
     pub fn stop_task(&mut self) {
@@ -331,6 +339,7 @@ impl Model {
     }
 
     pub fn process_command(&mut self, command: Command) {
+        log::info!("Processing command {:?}", command);
         match command {
             Command::Checkout => self.checkout(),
             Command::Quit => self.quit(),
@@ -344,13 +353,12 @@ impl Model {
             }
             Command::Sync => self.sync(),
             Command::Sort => self.app_state = AppState::EditSort,
-            Command::Cancel => {
+            Command::BackToNormal => {
                 self.app_state = AppState::Normal;
             }
             Command::DoDeleteBranch => {
                 self.delete();
             }
-            _ => {}
         }
     }
 }

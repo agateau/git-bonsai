@@ -183,7 +183,7 @@ impl App {
     }
 
     fn render_progress_popup(&mut self, frame: &mut Frame) {
-        let AppState::RunningTask { ref task } = self.model.app_state else {
+        let AppState::RunningTask { ref task, .. } = self.model.app_state else {
             return;
         };
         let action = if task.success().is_some() {
@@ -323,7 +323,7 @@ impl App {
                 self.handle_action_key_event(key_event, &[on_cancel.clone(), on_confirm.clone()]);
             }
             AppState::Exiting => {}
-            AppState::RunningTask { task: _ } => {
+            AppState::RunningTask { .. } => {
                 self.handle_running_task_key_event(key_event);
             }
         }
