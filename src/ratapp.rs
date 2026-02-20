@@ -142,8 +142,7 @@ impl App {
 
         let sort_by = self.model.sort_by();
         let format_column = |text: &str, column: Column| {
-            let is_current_column = sort_by.column == column;
-            let indicator = if is_current_column {
+            let indicator = if sort_by.column == column {
                 if sort_by.ascending {
                     " ▲"
                 } else {
@@ -153,7 +152,7 @@ impl App {
                 ""
             };
             let txt = format!("{text}{indicator}");
-            if matches!(self.model.app_state, AppState::EditSort) && is_current_column {
+            if self.model.focused_column == column {
                 Span::raw(txt).yellow()
             } else {
                 Span::raw(txt)
@@ -257,17 +256,6 @@ impl App {
         frame.render_widget(Line::from(format!("Filter: {}▎", &filter)), area);
     }
 
-    fn render_sort_bar(&mut self, frame: &mut Frame, area: Rect) {
-        let actions: Vec<Action<()>> = vec![
-            Action::new("Previous".into(), KeyCode::Left, ()),
-            Action::new("Next".into(), KeyCode::Right, ()),
-            Action::new("Ascending".into(), KeyCode::Up, ()),
-            Action::new("Descending".into(), KeyCode::Down, ()),
-            Action::new("Done".into(), KeyCode::Esc, ()),
-        ];
-        uiutils::render_toolbar(frame, area, &actions);
-    }
-
     fn draw(&mut self, frame: &mut Frame) {
         let [content, footer] =
             Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(frame.area());
@@ -282,7 +270,6 @@ impl App {
             AppState::EditFilter => {
                 self.render_filter_bar(frame, footer, self.model.filter().into())
             }
-            AppState::EditSort => self.render_sort_bar(frame, footer),
             AppState::Normal => self.render_toolbar(frame, footer),
             _ => {}
         };
@@ -311,9 +298,6 @@ impl App {
             }
             AppState::EditFilter => {
                 self.handle_edit_filter_key_event(key_event);
-            }
-            AppState::EditSort => {
-                self.handle_edit_sort_key_event(key_event);
             }
             AppState::Confirm {
                 on_cancel,
@@ -344,6 +328,8 @@ impl App {
         match key_event.code {
             KeyCode::Up => self.model.move_up(),
             KeyCode::Down => self.model.move_down(),
+            KeyCode::Left => self.model.focus_previous_column(),
+            KeyCode::Right => self.model.focus_next_column(),
             KeyCode::PageUp => self.model.page_up(),
             KeyCode::PageDown => self.model.page_down(),
             KeyCode::Home => self.model.move_start(),
@@ -376,32 +362,6 @@ impl App {
             }
             KeyCode::Esc => {
                 self.model.set_filter("");
-                self.model.app_state = AppState::Normal;
-            }
-            _ => {}
-        }
-    }
-
-    fn handle_edit_sort_key_event(&mut self, key_event: KeyEvent) {
-        let mut sort_by = self.model.sort_by();
-        match key_event.code {
-            KeyCode::Left => {
-                sort_by.column = sort_by.column.prev();
-                self.model.set_sort_by(sort_by);
-            }
-            KeyCode::Right => {
-                sort_by.column = sort_by.column.next();
-                self.model.set_sort_by(sort_by);
-            }
-            KeyCode::Up => {
-                sort_by.ascending = true;
-                self.model.set_sort_by(sort_by);
-            }
-            KeyCode::Down => {
-                sort_by.ascending = false;
-                self.model.set_sort_by(sort_by);
-            }
-            KeyCode::Enter | KeyCode::Esc => {
                 self.model.app_state = AppState::Normal;
             }
             _ => {}

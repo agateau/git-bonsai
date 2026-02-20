@@ -4,7 +4,7 @@
 
 use git::{AheadBehindStatus, Branch, CheckoutState, GitResult};
 
-use crate::repositorymodel::{RepositoryModel, SortBy};
+use crate::repositorymodel::{Column, RepositoryModel, SortBy};
 use crate::task::Task;
 use crate::ui::action::Action;
 
@@ -37,8 +37,6 @@ pub enum AppState {
     Normal,
     /// Filter UI is visible
     EditFilter,
-    /// Edit the sort order
-    EditSort,
     /// Showing an error message
     Error(String),
     /// Showing a confirmation message
@@ -64,6 +62,7 @@ pub struct Model {
     pub cancel_action: Action<Command>,
     repo_model: RepositoryModel,
     pub table_state: TableState,
+    pub focused_column: Column,
     pub app_state: AppState,
     pub page_size: usize,
 }
@@ -121,6 +120,7 @@ impl Model {
             close_action,
             repo_model: RepositoryModel::new(path),
             table_state: TableState::default(),
+            focused_column: Column::Name,
             app_state: AppState::Normal,
             page_size: 10,
         }
@@ -209,6 +209,14 @@ impl Model {
             }
             None => self.table_state.select(Some(0)),
         };
+    }
+
+    pub fn focus_previous_column(&mut self) {
+        self.focused_column = self.focused_column.prev();
+    }
+
+    pub fn focus_next_column(&mut self) {
+        self.focused_column = self.focused_column.next();
     }
 
     pub fn page_up(&mut self) {
@@ -352,7 +360,15 @@ impl Model {
                 }
             }
             Command::Sync => self.sync(),
-            Command::Sort => self.app_state = AppState::EditSort,
+            Command::Sort => {
+                let mut sort_by = self.sort_by();
+                if self.focused_column == sort_by.column {
+                    sort_by.ascending = !sort_by.ascending;
+                } else {
+                    sort_by.column = self.focused_column;
+                }
+                self.set_sort_by(sort_by);
+            }
             Command::BackToNormal => {
                 self.app_state = AppState::Normal;
             }
