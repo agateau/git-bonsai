@@ -7,9 +7,31 @@ use std::path::Path;
 use std::sync::mpsc;
 use std::thread;
 
-use git::{AheadBehindStatus, Branch, GitResult, Repository};
+use git::{AheadBehindStatus, Branch, GitResult, Repository, Upstream};
 
 use crate::gitsynctask::GitSyncTask;
+
+const STATUS_LOCAL_ONLY: &str = "Local only";
+const STATUS_GONE: &str = "Gone";
+const STATUS_UP_TO_DATE: &str = "Up-to-date";
+const STATUS_DIVERGED: &str = "Diverged";
+const STATUS_BEHIND: &str = "Can be FF";
+const STATUS_AHEAD: &str = "In advance";
+
+pub fn get_upstream_status(upstream: &Option<Upstream>) -> &'static str {
+    let Some(upstream) = upstream else {
+        return STATUS_LOCAL_ONLY;
+    };
+    let Some(ahead_behind) = &upstream.ahead_behind else {
+        return STATUS_GONE;
+    };
+    match ahead_behind.status() {
+        AheadBehindStatus::UpToDate => STATUS_UP_TO_DATE,
+        AheadBehindStatus::Behind => STATUS_BEHIND,
+        AheadBehindStatus::Ahead => STATUS_AHEAD,
+        AheadBehindStatus::Diverged => STATUS_DIVERGED,
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Request {
@@ -59,6 +81,32 @@ pub struct SortBy {
     pub ascending: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FilterBy {
+    pub column: Column,
+    pub value: String,
+}
+
+impl FilterBy {
+    pub fn new(column: Column, value: &str) -> Self {
+        Self {
+            column,
+            value: value.into(),
+        }
+    }
+
+    pub fn apply(&self, branch: &Branch) -> bool {
+        match self.column {
+            Column::Name => branch.name.contains(&self.value),
+            Column::LastCommit => branch.last_commit_date.to_rfc3339().contains(&self.value),
+            Column::Status => {
+                let status_str = get_upstream_status(&branch.upstream);
+                status_str.contains(&self.value)
+            }
+        }
+    }
+}
+
 fn get_status_key(branch: &Branch) -> usize {
     let Some(ref upstream) = branch.upstream else {
         return 0;
@@ -77,7 +125,7 @@ fn get_status_key(branch: &Branch) -> usize {
 /// Knows the branch of a git repository, and can fetch info about them
 pub struct RepositoryModel {
     repo: Repository,
-    filter: String,
+    filter_by: Option<FilterBy>,
     /// The branches, before applying the filter
     all_branches: Vec<Branch>,
     /// The filtered branches
@@ -119,7 +167,7 @@ impl RepositoryModel {
 
         Self {
             repo,
-            filter: "".into(),
+            filter_by: None,
             all_branches: vec![],
             branches: vec![],
             branches_containing: HashMap::new(),
@@ -133,14 +181,17 @@ impl RepositoryModel {
     }
 
     pub fn filter(&self) -> &str {
-        &self.filter
+        match &self.filter_by {
+            Some(x) => &x.value,
+            None => "",
+        }
     }
 
-    pub fn set_filter(&mut self, filter: &str) {
-        if self.filter == filter {
+    pub fn set_filter_by(&mut self, filter_by: Option<FilterBy>) {
+        if self.filter_by == filter_by {
             return;
         }
-        self.filter = filter.into();
+        self.filter_by = filter_by;
         self.apply_filter();
     }
 
@@ -158,12 +209,16 @@ impl RepositoryModel {
 
     /// Update self.branches from self.all_branches
     fn apply_filter(&mut self) {
-        self.branches = self
-            .all_branches
-            .iter()
-            .filter(|x| x.name.contains(&self.filter))
-            .cloned()
-            .collect();
+        if let Some(ref filter_by) = self.filter_by {
+            self.branches = self
+                .all_branches
+                .iter()
+                .filter(|x| filter_by.apply(x))
+                .cloned()
+                .collect();
+        } else {
+            self.branches = self.all_branches.clone();
+        }
         match self.sort_by.column {
             Column::Name => self.branches.sort_by_key(|x| x.name.clone()),
             Column::LastCommit => self.branches.sort_by_key(|x| x.last_commit_date),

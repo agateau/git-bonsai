@@ -14,11 +14,11 @@ use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Row, Table};
 use ratatui::Frame;
 
-use git::{AheadBehindStatus, CheckoutState, Upstream};
+use git::CheckoutState;
 
 use crate::cliargs::CliArgs;
 use crate::model::{AppState, Command, Model};
-use crate::repositorymodel::Column;
+use crate::repositorymodel::{get_upstream_status, Column};
 use crate::ui::action::Action;
 use crate::ui::{popup::Popup, uiutils};
 
@@ -29,28 +29,6 @@ const EVENT_POLL_DURATION: Duration = Duration::from_millis(32);
 const MAX_CONTAINED_IN_BRANCHES: usize = 2;
 
 const EMPTY_STR: &str = "";
-
-const STATUS_LOCAL_ONLY: &str = "Local only";
-const STATUS_GONE: &str = "Gone";
-const STATUS_UP_TO_DATE: &str = "Up-to-date";
-const STATUS_DIVERGED: &str = "Diverged";
-const STATUS_BEHIND: &str = "Can be FF";
-const STATUS_AHEAD: &str = "In advance";
-
-fn get_upstream_status(upstream: &Option<Upstream>) -> &'static str {
-    let Some(upstream) = upstream else {
-        return STATUS_LOCAL_ONLY;
-    };
-    let Some(ahead_behind) = &upstream.ahead_behind else {
-        return STATUS_GONE;
-    };
-    match ahead_behind.status() {
-        AheadBehindStatus::UpToDate => STATUS_UP_TO_DATE,
-        AheadBehindStatus::Behind => STATUS_BEHIND,
-        AheadBehindStatus::Ahead => STATUS_AHEAD,
-        AheadBehindStatus::Diverged => STATUS_DIVERGED,
-    }
-}
 
 struct App {
     model: Model,

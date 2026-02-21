@@ -4,7 +4,7 @@
 
 use git::{AheadBehindStatus, Branch, CheckoutState, GitResult};
 
-use crate::repositorymodel::{Column, RepositoryModel, SortBy};
+use crate::repositorymodel::{Column, FilterBy, RepositoryModel, SortBy};
 use crate::task::Task;
 use crate::ui::action::Action;
 
@@ -131,7 +131,12 @@ impl Model {
     }
 
     pub fn set_filter(&mut self, value: &str) {
-        self.repo_model.set_filter(value);
+        let filter_by = if value.is_empty() {
+            None
+        } else {
+            Some(FilterBy::new(self.focused_column, value))
+        };
+        self.repo_model.set_filter_by(filter_by);
         let visible_branch_count = self.branches().len();
         if visible_branch_count == 0 {
             self.table_state.select(None);
