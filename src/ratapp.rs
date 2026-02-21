@@ -14,7 +14,7 @@ use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Row, Table};
 use ratatui::Frame;
 
-use git::{AheadBehind, AheadBehindStatus, CheckoutState, Upstream};
+use git::{AheadBehindStatus, CheckoutState, Upstream};
 
 use crate::cliargs::CliArgs;
 use crate::model::{AppState, Command, Model};
@@ -30,21 +30,25 @@ const MAX_CONTAINED_IN_BRANCHES: usize = 2;
 
 const EMPTY_STR: &str = "";
 
-const AB_GONE: &str = "Gone";
-const AB_UP_TO_DATE: &str = "Up-to-date";
-const AB_DIVERGED: &str = "Diverged";
-const AB_BEHIND: &str = "Can be FF";
-const AB_AHEAD: &str = "In advance";
+const STATUS_LOCAL_ONLY: &str = "Local only";
+const STATUS_GONE: &str = "Gone";
+const STATUS_UP_TO_DATE: &str = "Up-to-date";
+const STATUS_DIVERGED: &str = "Diverged";
+const STATUS_BEHIND: &str = "Can be FF";
+const STATUS_AHEAD: &str = "In advance";
 
-fn get_ahead_behind_str(ahead_behind: &Option<AheadBehind>) -> &'static str {
-    let Some(ahead_behind) = ahead_behind else {
-        return AB_GONE;
+fn get_upstream_status(upstream: &Option<Upstream>) -> &'static str {
+    let Some(upstream) = upstream else {
+        return STATUS_LOCAL_ONLY;
+    };
+    let Some(ahead_behind) = &upstream.ahead_behind else {
+        return STATUS_GONE;
     };
     match ahead_behind.status() {
-        AheadBehindStatus::UpToDate => AB_UP_TO_DATE,
-        AheadBehindStatus::Behind => AB_BEHIND,
-        AheadBehindStatus::Ahead => AB_AHEAD,
-        AheadBehindStatus::Diverged => AB_DIVERGED,
+        AheadBehindStatus::UpToDate => STATUS_UP_TO_DATE,
+        AheadBehindStatus::Behind => STATUS_BEHIND,
+        AheadBehindStatus::Ahead => STATUS_AHEAD,
+        AheadBehindStatus::Diverged => STATUS_DIVERGED,
     }
 }
 
@@ -88,12 +92,11 @@ impl App {
                     CheckoutState::Current => "*",
                     CheckoutState::WorkTree(_) => "+",
                 };
-                let (upstream_str, status_str): (String, &str) = match &branch.upstream {
-                    None => (String::new(), EMPTY_STR),
-                    Some(Upstream { name, ahead_behind }) => {
-                        (name.clone(), get_ahead_behind_str(ahead_behind))
-                    }
+                let upstream_str: String = match &branch.upstream {
+                    Some(x) => x.name.to_string(),
+                    None => EMPTY_STR.to_string(),
                 };
+                let status_str = get_upstream_status(&branch.upstream);
                 let contained_in_str: String = match self.model.branches_containing(&branch.name) {
                     // We don't know yet
                     None => "...".into(),
