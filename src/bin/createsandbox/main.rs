@@ -8,21 +8,22 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use clap::{Parser, Subcommand};
 use git_bonsai::logger::setup_stderr_logger;
 use regex::Regex;
-use structopt::StructOpt;
 
 use git::{Repository, INITIAL_BRANCH};
 
-#[derive(StructOpt)]
+#[derive(Parser)]
+#[command(name = "createsandbox")]
 struct CliArgs {
-    #[structopt(short = "d", long = "debug")]
+    #[arg(short = 'd', long = "debug")]
     pub debug: bool,
-    #[structopt(subcommand)]
+    #[command(subcommand)]
     pub cmd: Command,
 }
 
-#[derive(StructOpt)]
+#[derive(Subcommand)]
 enum Command {
     /// Create a test repository with lots of branches
     ManyBranches {
@@ -163,7 +164,7 @@ fn branch_states_cmd(sandbox_dir: PathBuf) {
 }
 
 fn main() {
-    let args = CliArgs::from_args();
+    let args = CliArgs::parse();
     if args.debug {
         setup_stderr_logger();
     }

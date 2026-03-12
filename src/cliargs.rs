@@ -18,12 +18,13 @@
  */
 use std::path::PathBuf;
 
-use structopt::StructOpt;
+use clap::Parser;
 
-#[derive(StructOpt)]
+#[derive(Parser)]
+#[command(name = "git-bonsai", version, about)]
 /// Keep a git repository clean and tidy.
 pub struct CliArgs {
     /// Log to file
-    #[structopt(short = "l", long = "log")]
+    #[arg(short = 'l', long = "log")]
     pub log_path: Option<PathBuf>,
 }

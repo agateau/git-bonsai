@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-use structopt::StructOpt;
 
 mod cliargs;
 mod gitsynctask;
@@ -30,8 +29,10 @@ mod worker;
 
 use cliargs::CliArgs;
 
+use clap::Parser;
+
 fn main() {
-    let args = CliArgs::from_args();
+    let args = CliArgs::parse();
     if let Some(log_path) = &args.log_path {
         logger::setup_file_logger(log_path);
     }
