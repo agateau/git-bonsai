@@ -4,6 +4,7 @@
 
 use git::{AheadBehindStatus, Branch, CheckoutState, GitResult};
 
+use crate::gitsynctask::GitSyncTask;
 use crate::repositorymodel::{Column, FilterBy, RepositoryModel, SortBy};
 use crate::task::Task;
 use crate::ui::action::Action;
@@ -25,6 +26,7 @@ pub enum Command {
     BackToNormal,
     Sort,
     DoDeleteBranch,
+    OnSyncFinished,
 }
 
 fn create_confirm_action(name: String, command: Command) -> Action<Command> {
@@ -288,11 +290,12 @@ impl Model {
     }
 
     pub fn sync(&mut self) {
-        let mut task: Box<dyn Task> = Box::new(self.repo_model.start_syncing());
+        let repo = self.repo_model.repository();
+        let mut task: Box<dyn Task> = Box::new(GitSyncTask::new(repo));
         task.start();
         self.app_state = AppState::RunningTask {
             task,
-            on_success: Command::BackToNormal,
+            on_success: Command::OnSyncFinished,
         };
     }
 
@@ -380,15 +383,24 @@ impl Model {
             Command::DoDeleteBranch => {
                 self.delete();
             }
+            Command::OnSyncFinished => {
+                if let Err(error) = self.repo_model.update_branches() {
+                    self.app_state = AppState::Error(format!("{}", error));
+                } else {
+                    self.app_state = AppState::Normal;
+                }
+            }
         }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use git::{Repository, INITIAL_BRANCH};
+    use std::fs;
 
-    use crate::model::Model;
+    use git::{AheadBehindStatus, Repository, INITIAL_BRANCH};
+
+    use super::*;
 
     fn create_empty_commit(repo: &Repository) {
         repo.git("commit", &["-m", "empty", "--allow-empty"])
@@ -481,5 +493,63 @@ mod test {
 
         // THEN no branches are selected
         assert_eq!(model.current_branch(), None);
+    }
+
+    #[test]
+    fn status_for_removed_remote_branch_becomes_gone_after_sync() {
+        let branch_name = "test";
+        let tmp_dir = assert_fs::TempDir::new().unwrap();
+        let remote_path = tmp_dir.join("remote");
+        let local_path = tmp_dir.join("local");
+
+        // GIVEN a remote repository
+        fs::create_dir(&remote_path).unwrap();
+        let remote_repo = Repository::new(&remote_path);
+        remote_repo.init().unwrap();
+        create_empty_commit(&remote_repo);
+
+        // AND the repository has a "test" branch
+        remote_repo.create_branch(branch_name).unwrap();
+        create_empty_commit(&remote_repo);
+        remote_repo.checkout(INITIAL_BRANCH).unwrap();
+
+        // AND a local clone of the repository
+        fs::create_dir(&local_path).unwrap();
+        let remote_url = format!("file://{}", remote_path.display());
+        let local_repo = Repository::clone_repository(&local_path, &remote_url).unwrap();
+
+        // AND the local clone checkouts the "test" branch
+        local_repo.checkout(branch_name).unwrap();
+
+        // AND a model for the local clone
+        let mut model = Model::new(&local_path);
+        model.update_branches().unwrap();
+
+        let get_branch_ahead_behind = |model: &Model| {
+            let branch = model
+                .branches()
+                .iter()
+                .find(|x| x.name == branch_name)
+                .unwrap();
+            branch.upstream.clone().unwrap().ahead_behind
+        };
+
+        // AND the "test" branch status in the local repository is: UpToDate
+        assert_eq!(
+            get_branch_ahead_behind(&model).unwrap().status(),
+            AheadBehindStatus::UpToDate
+        );
+
+        // WHEN the "test" branch is removed from the remote repository
+        remote_repo.delete_branch(branch_name).unwrap();
+
+        // AND the model syncs
+        model.sync();
+        while !matches!(model.app_state, AppState::Normal) {
+            model.update();
+        }
+
+        // THEN the "test" branch status is: Gone
+        assert!(get_branch_ahead_behind(&model).is_none());
     }
 }

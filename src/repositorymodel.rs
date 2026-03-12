@@ -9,8 +9,6 @@ use std::thread;
 
 use git::{AheadBehindStatus, Branch, GitResult, Repository, Upstream};
 
-use crate::gitsynctask::GitSyncTask;
-
 const STATUS_LOCAL_ONLY: &str = "Local only";
 const STATUS_GONE: &str = "Gone";
 const STATUS_UP_TO_DATE: &str = "Up-to-date";
@@ -291,8 +289,8 @@ impl RepositoryModel {
         Ok(())
     }
 
-    pub fn start_syncing(&self) -> GitSyncTask {
-        GitSyncTask::new(self.repo.clone())
+    pub fn repository(&self) -> Repository {
+        self.repo.clone()
     }
 }
 
