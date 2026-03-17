@@ -139,22 +139,26 @@ impl Model {
             Some(FilterBy::new(self.focused_column, value))
         };
         self.repo_model.set_filter_by(filter_by);
+        self.update_selected_branch();
+    }
+
+    /// If the current branch is gone, select another one
+    fn update_selected_branch(&mut self) {
         let visible_branch_count = self.branches().len();
         if visible_branch_count == 0 {
             self.table_state.select(None);
-        } else {
-            match self.table_state.selected() {
-                None => {
-                    if visible_branch_count > 0 {
-                        self.table_state.select(Some(0));
-                    }
-                }
-                Some(x) => {
-                    if x >= visible_branch_count {
-                        self.table_state.select(Some(visible_branch_count - 1));
-                    }
-                }
+            return;
+        }
+        match self.table_state.selected() {
+            // No selection, pick the first branch if there is any
+            None if visible_branch_count > 0 => {
+                self.table_state.select(Some(0));
             }
+            // Selected branch does not exist anymore, pick the last one
+            Some(x) if x >= visible_branch_count => {
+                self.table_state.select(Some(visible_branch_count - 1));
+            }
+            _ => {}
         }
     }
 
@@ -281,11 +285,7 @@ impl Model {
             self.app_state = AppState::Error(format!("{}", error));
             return;
         }
-        // Select the previous branch if we were on the last one
-        let nb_branches = self.branches().len();
-        if self.table_state.selected() == Some(nb_branches) {
-            self.table_state.select(Some(nb_branches - 1));
-        }
+        self.update_selected_branch();
         self.app_state = AppState::Normal;
     }
 
