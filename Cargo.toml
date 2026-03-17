@@ -26,6 +26,7 @@ categories = ["command-line-utilities", "development-tools"]
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
+default-run = "git-bonsai"
 
 [dependencies]
 chrono.workspace = true
