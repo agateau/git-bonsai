@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use git::{AheadBehindStatus, Branch, CheckoutState, GitResult};
+use ratatui::style::Style;
 use ratatui_textarea::TextArea;
 
 use crate::gitsynctask::GitSyncTask;
@@ -127,7 +128,12 @@ impl<'a> Model<'a> {
             focused_column: Column::Name,
             app_state: AppState::Normal,
             page_size: 10,
-            filter_text_area: TextArea::default(),
+            filter_text_area: {
+                let mut text_area = TextArea::default();
+                // Remove line below text area
+                text_area.set_cursor_line_style(Style::default());
+                text_area
+            },
         }
     }
 
