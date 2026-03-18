@@ -178,13 +178,6 @@ impl RepositoryModel {
         }
     }
 
-    pub fn filter(&self) -> &str {
-        match &self.filter_by {
-            Some(x) => &x.value,
-            None => "",
-        }
-    }
-
     pub fn set_filter_by(&mut self, filter_by: Option<FilterBy>) {
         if self.filter_by == filter_by {
             return;

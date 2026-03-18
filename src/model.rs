@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use git::{AheadBehindStatus, Branch, CheckoutState, GitResult};
+use ratatui_textarea::TextArea;
 
 use crate::gitsynctask::GitSyncTask;
 use crate::repositorymodel::{Column, FilterBy, RepositoryModel, SortBy};
@@ -55,7 +56,7 @@ pub enum AppState {
 }
 
 /// The UI "model". Contains all the state used by the UI.
-pub struct Model {
+pub struct Model<'a> {
     pub actions: Vec<Action<Command>>,
     checkout_action_idx: usize,
     delete_action_idx: usize,
@@ -67,9 +68,10 @@ pub struct Model {
     pub focused_column: Column,
     pub app_state: AppState,
     pub page_size: usize,
+    pub filter_text_area: TextArea<'a>,
 }
 
-impl Model {
+impl<'a> Model<'a> {
     pub fn new(path: &Path) -> Self {
         let mut actions: Vec<Action<Command>> = vec![];
 
@@ -125,11 +127,12 @@ impl Model {
             focused_column: Column::Name,
             app_state: AppState::Normal,
             page_size: 10,
+            filter_text_area: TextArea::default(),
         }
     }
 
-    pub fn filter(&self) -> &str {
-        self.repo_model.filter()
+    fn has_filter(&self) -> bool {
+        !self.filter_text_area.lines()[0].is_empty()
     }
 
     pub fn set_filter(&mut self, value: &str) {
@@ -187,7 +190,7 @@ impl Model {
         self.actions[self.checkout_action_idx].enabled = is_not_checked_out;
         self.actions[self.delete_action_idx].enabled = is_not_checked_out;
 
-        let filter_suffix = if self.filter().is_empty() { "" } else { "*" };
+        let filter_suffix = if self.has_filter() { "*" } else { "" };
         self.actions[self.filter_action_idx].name = format!("Filter{filter_suffix}");
     }
 

@@ -10,7 +10,7 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Style, Stylize};
-use ratatui::text::{Line, Span, Text};
+use ratatui::text::{Span, Text};
 use ratatui::widgets::{Row, Table};
 use ratatui::Frame;
 
@@ -30,11 +30,11 @@ const MAX_CONTAINED_IN_BRANCHES: usize = 2;
 
 const EMPTY_STR: &str = "";
 
-struct App {
-    model: Model,
+struct App<'a> {
+    model: Model<'a>,
 }
 
-impl App {
+impl<'a> App<'a> {
     fn new(_cli_args: CliArgs, path: &Path) -> Self {
         Self {
             model: Model::new(path),
@@ -233,8 +233,15 @@ impl App {
         frame.render_widget(popup, area);
     }
 
-    fn render_filter_bar(&mut self, frame: &mut Frame, area: Rect, filter: String) {
-        frame.render_widget(Line::from(format!("Filter: {}▎", &filter)), area);
+    fn render_filter_bar(&mut self, frame: &mut Frame, area: Rect) {
+        let label_text = "Filter: ";
+        let layout = Layout::horizontal([
+            Constraint::Length(label_text.len() as u16),
+            Constraint::Fill(1),
+        ]);
+        let [label_rect, text_area_rect] = layout.areas(area);
+        frame.render_widget(Span::raw(label_text), label_rect);
+        frame.render_widget(&self.model.filter_text_area, text_area_rect);
     }
 
     fn draw(&mut self, frame: &mut Frame) {
@@ -248,9 +255,7 @@ impl App {
 
         // Toolbar
         match &self.model.app_state {
-            AppState::EditFilter => {
-                self.render_filter_bar(frame, footer, self.model.filter().into())
-            }
+            AppState::EditFilter => self.render_filter_bar(frame, footer),
             AppState::Normal => self.render_toolbar(frame, footer),
             _ => {}
         };
@@ -327,25 +332,20 @@ impl App {
 
     fn handle_edit_filter_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
-            KeyCode::Char(ch) => {
-                let mut filter = self.model.filter().to_string();
-                filter.push(ch);
-                self.model.set_filter(&filter);
-            }
-            KeyCode::Backspace => {
-                if !self.model.filter().is_empty() {
-                    let filter = self.model.filter()[..self.model.filter().len() - 1].to_string();
-                    self.model.set_filter(&filter);
-                }
-            }
             KeyCode::Enter => {
                 self.model.app_state = AppState::Normal;
+                return;
             }
             KeyCode::Esc => {
                 self.model.set_filter("");
                 self.model.app_state = AppState::Normal;
+                return;
             }
             _ => {}
+        }
+        if self.model.filter_text_area.input(key_event) {
+            let filter = self.model.filter_text_area.lines()[0].clone();
+            self.model.set_filter(&filter);
         }
     }
 
